@@ -45,13 +45,21 @@ class Accelerometer(Plugin):
 
     def setup(self):
         # set up accelerometer specific blocks
+        palette = make_palette('extras',
+                               colors=["#FF0000", "#A00000"],
+                               help_string=_('Palette of extra options'),
+                               position=8,
+                               translation=_('extras'))
+        '''
         palette = make_palette('sensor',
                                colors=["#FF6060", "#A06060"],
                                help_string=_('Palette of sensor blocks'),
                                position=6)
+        '''
 
         if self._status:
             palette.add_block('xyz',
+                              hidden=True,
                               style='basic-style-extended-vertical',
                               label=_('acceleration'),
                               help_string=\
@@ -59,11 +67,11 @@ class Accelerometer(Plugin):
                               prim_name='xyz')
         else:
             palette.add_block('xyz',
+                              hidden=True,
                               style='basic-style-extended-vertical',
                               label=_('acceleration'),
                               help_string=\
                                   _('push acceleration in x, y, z to heap'),
-                              hidden=True,
                               prim_name='xyz')
 
         self._parent.lc.def_prim(

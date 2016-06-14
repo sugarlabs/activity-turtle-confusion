@@ -82,13 +82,21 @@ class Rfid(Plugin):
 
     def setup(self):
         # set up RFID-specific blocks
+        palette = make_palette('extras',
+                               colors=["#FF0000", "#A00000"],
+                               help_string=_('Palette of extra options'),
+                               position=8,
+                               translation=_('extras'))
+        '''
         palette = make_palette('sensor',
                                colors=["#FF6060", "#A06060"],
                                help_string=_('Palette of sensor blocks'),
                                position=6)
+        '''
 
         if self._status:
             palette.add_block('rfid',
+                              hidden=True,
                               style='box-style',
                               label=_('RFID'),
                               help_string=_('read value from RFID device'),
