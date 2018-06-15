@@ -1,5 +1,5 @@
-#Copyright (c) 2008, Media Modifications Ltd.
-#Copyright (c) 2011, Walter Bender
+# Copyright (c) 2008, Media Modifications Ltd.
+# Copyright (c) 2011, Walter Bender
 
 # This procedure is invoked when the user-definable block on the
 # "extras" palette is selected.
@@ -25,6 +25,7 @@ def myblock(tw, args):
     from gettext import gettext as _
 
     class Grecord:
+
         ''' A class for creating a gstreamer session for recording audio. '''
 
         def __init__(self, tw):
@@ -149,19 +150,19 @@ def myblock(tw, args):
             position, duration = self._query_position(pipe)
             if position != gst.CLOCK_TIME_NONE:
                 value = position * 100.0 / duration
-                value = value/100.0
+                value = value / 100.0
             return True
 
         def _query_position(self, pipe):
             ''' Where are we in the stream? '''
             try:
                 position, format = pipe.query_position(gst.FORMAT_TIME)
-            except:
+            except BaseException:
                 position = gst.CLOCK_TIME_NONE
 
             try:
                 duration, format = pipe.query_duration(gst.FORMAT_TIME)
-            except:
+            except BaseException:
                 duration = gst.CLOCK_TIME_NONE
 
             return (position, duration)

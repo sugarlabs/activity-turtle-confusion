@@ -3,23 +3,23 @@
 # Copyright (c) 2012 Raul Gutierrez S. - rgs@itevenworks.net
 # Copyright (c) 2013 Alan Aguiar alanjas@hotmail.com
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 # NOTE: This is a plugin to enable uploading of Turtle Art projects to
 # Facebook. It currently works for the GTK3 version of Turtle Blocks and
@@ -34,14 +34,16 @@
 import pycurl
 import urlparse
 
-import gtk
+from gi.repository import Gtk
+
 try:
-    import webkit
-    WEBKIT = True
-except ImportError:
-    WEBKIT = False
+    from gi.repository import WebKit
+    HAS_WEBKIT = True
+except BaseException:
+    pass
+    HAS_WEBKIT = False
 from plugin import Plugin
-from util.menubuilder import MenuBuilder, MENUBAR
+from TurtleArt.util.menubuilder import make_menu_item, make_sub_menu, MENUBAR
 from gettext import gettext as _
 
 
@@ -55,7 +57,7 @@ class FbUploader():
     def doit(self):
         c = pycurl.Curl()
         c.setopt(c.POST, 1)
-        c.setopt(c.URL,  self._get_url())
+        c.setopt(c.URL, self._get_url())
         c.setopt(c.HTTPPOST, self._get_params(c))
         c.perform()
         print c.getinfo(c.HTTP_CODE)
@@ -83,13 +85,13 @@ class Fb_plugin(Plugin):
             menu, upload_menu = MENUBAR[_('Upload')]
         else:
             upload_menu = None
-            menu = gtk.Menu()
-        MenuBuilder.make_menu_item(menu, _('Facebook wall post'),
-                                   self._post_menu_cb)
+            menu = Gtk.Menu()
+
+        make_menu_item(menu, _('Facebook wall post'), self._post_menu_cb)
         if upload_menu is not None:
             return None  # We don't have to add it since it already exists
         else:
-            upload_menu = MenuBuilder.make_sub_menu(menu, _('Upload'))
+            upload_menu = make_sub_menu(menu, _('Upload'))
             return upload_menu
 
     def set_tw(self, turtleart_window):
@@ -99,23 +101,21 @@ class Fb_plugin(Plugin):
         return True
 
     def _post_menu_cb(self, widget):
-        if not WEBKIT:
-            self.tw.showlabel('status',
-                              'install webkit: sudo yum install pywebkitgtk')
-            print('webkit not installed: sudo yum install pywebkitgtk')
-            return
 
         if self._access_token == "":
             self._grab_fb_app_token()
             return
 
-        self._post_to_fb()
+        try:
+            self._post_to_fb()
+        except Exception as e:
+            print 'error while posting to Facebook:', e
 
     def _grab_fb_app_token(self):
         url = self._get_auth_url()
-        w = gtk.Window()
-        sw = gtk.ScrolledWindow()
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        w = Gtk.Window()
+        sw = Gtk.ScrolledWindow()
+        sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         sw.show()
         w.move(200, 200)
         w.set_size_request(800, 400)

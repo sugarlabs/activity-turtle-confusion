@@ -1,53 +1,44 @@
-#copyright (c) 2007-8, Playful Invention Company
-#Copyright (c) 2008-13, Walter Bender
-#Copyright (c) 2013 Alan Aguiar
+# copyright (c) 2007-8, Playful Invention Company
+# Copyright (c) 2008-13, Walter Bender
+# Copyright (c) 2013 Alan Aguiar
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
-import gtk
-import gobject
-try:
-    import gconf
-    HAS_GCONF = True
-except ImportError:
-    HAS_GCONF = False
+import gi
+import tempfile
 import dbus
 import cairo
 import pickle
 import subprocess
 import os
+import stat
 import string
+import mimetypes
 from gettext import gettext as _
-
-try:
-    OLD_SUGAR_SYSTEM = False
-    import json
-    json.dumps
-    from json import load as jload
-    from json import dump as jdump
-except (ImportError, AttributeError):
-    try:
-        import simplejson as json
-        from simplejson import load as jload
-        from simplejson import dump as jdump
-    except:
-        OLD_SUGAR_SYSTEM = True
+from gi.repository import Gtk
+from gi.repository import GObject
+from gi.repository import GdkPixbuf
+from gi.repository import Gio
+import json
+json.dumps
+from json import load as jload
+from json import dump as jdump
 from StringIO import StringIO
 
 from taconstants import (HIT_HIDE, HIT_SHOW, XO1, XO15, XO175, XO4, UNKNOWN,
@@ -143,32 +134,30 @@ def magnitude(pos):
 
 def json_load(text):
     ''' Load JSON data using what ever resources are available. '''
-    if OLD_SUGAR_SYSTEM is True:
-        listdata = json.read(text)
+
+    # Remove MAGIC NUMBER, if present, and leading whitespace
+    if text[0:2] == MAGICNUMBER:
+        clean_text = text[2:].lstrip()
     else:
-        # Remove MAGIC NUMBER, if present, and leading whitespace
-        if text[0:2] == MAGICNUMBER:
-            clean_text = text[2:].lstrip()
-        else:
-            clean_text = text.lstrip()
-        # Strip out trailing whitespace, nulls, and newlines
-        clean_text = clean_text.replace('\12', '')
-        clean_text = clean_text.replace('\00', '')
-        clean_text = clean_text.rstrip()
-        # Look for missing ']'s
-        left_count = clean_text.count('[')
+        clean_text = text.lstrip()
+    # Strip out trailing whitespace, nulls, and newlines
+    clean_text = clean_text.replace('\12', '')
+    clean_text = clean_text.replace('\00', '')
+    clean_text = clean_text.rstrip()
+    # Look for missing ']'s
+    left_count = clean_text.count('[')
+    right_count = clean_text.count(']')
+    while left_count > right_count:
+        clean_text += ']'
         right_count = clean_text.count(']')
-        while left_count > right_count:
-            clean_text += ']'
-            right_count = clean_text.count(']')
-        io = StringIO(clean_text)
-        try:
-            listdata = jload(io)
-        except ValueError:
-            # Assume that text is ascii list
-            listdata = text.split()
-            for i, value in enumerate(listdata):
-                listdata[i] = convert(value, float)
+    io = StringIO(clean_text)
+    try:
+        listdata = jload(io)
+    except ValueError:
+        # Assume that text is ascii list
+        listdata = text.split()
+        for i, value in enumerate(listdata):
+            listdata[i] = convert(value, float)
     # json converts tuples to lists, so we need to convert back,
     return _tuplify(listdata)
 
@@ -176,7 +165,7 @@ def json_load(text):
 def find_hat(data):
     ''' Find a hat in a stack '''
     for i, blk in enumerate(data):
-        if _to_str(blk[1]) == 'hat':
+        if isinstance(blk[1], (tuple, list)) and _to_str(blk[1][0]) == 'hat':
             return i
     return None
 
@@ -284,32 +273,38 @@ def get_id(connection):
 
 def json_dump(data):
     ''' Save data using available JSON tools. '''
-    if OLD_SUGAR_SYSTEM is True:
-        return json.write(data)
-    else:
-        io = StringIO()
-        jdump(data, io)
-        return io.getvalue()
+    io = StringIO()
+    jdump(data, io)
+    return io.getvalue()
 
 
-def get_load_name(filefilter, load_save_folder):
+def get_endswith_files(path, end):
+    f = os.listdir(path)
+    files = []
+    for name in f:
+        if name.endswith(end):
+            files.append(os.path.join(path, name))
+    return files
+
+
+def get_load_name(filefilter, load_save_folder=None):
     ''' Open a load file dialog. '''
-    dialog = gtk.FileChooserDialog(
+    dialog = Gtk.FileChooserDialog(
         _('Load...'), None,
-        gtk.FILE_CHOOSER_ACTION_OPEN, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                                       gtk.STOCK_OPEN, gtk.RESPONSE_OK))
-    dialog.set_default_response(gtk.RESPONSE_OK)
+        Gtk.FileChooserAction.OPEN, (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                                     Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+    dialog.set_default_response(Gtk.ResponseType.OK)
     return do_dialog(dialog, filefilter, load_save_folder)
 
 
 def get_save_name(filefilter, load_save_folder, save_file_name):
     ''' Open a save file dialog. '''
-    dialog = gtk.FileChooserDialog(
+    dialog = Gtk.FileChooserDialog(
         _('Save...'), None,
-        gtk.FILE_CHOOSER_ACTION_SAVE, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                                       gtk.STOCK_SAVE, gtk.RESPONSE_OK))
-    dialog.set_default_response(gtk.RESPONSE_OK)
-    if filefilter in ['.png', '.svg', '.lg', '.py']:
+        Gtk.FileChooserAction.SAVE, (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                                     Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
+    dialog.set_default_response(Gtk.ResponseType.OK)
+    if filefilter in ['.png', '.svg', '.lg', '.py', '.odp']:
         suffix = filefilter
     else:
         suffix = SUFFIX[1]
@@ -322,7 +317,7 @@ def get_save_name(filefilter, load_save_folder, save_file_name):
 
 def chooser_dialog(parent_window, filter, action):
     ''' Choose an object from the datastore and take some action '''
-    from sugar.graphics.objectchooser import ObjectChooser
+    from sugar3.graphics.objectchooser import ObjectChooser
 
     chooser = None
     dsobject = None
@@ -333,17 +328,17 @@ def chooser_dialog(parent_window, filter, action):
         chooser = ObjectChooser(
             None,
             parent_window,
-            gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT)
+            Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT)
         cleanup_needed = True
 
     if chooser is not None:
         result = chooser.run()
-        if result == gtk.RESPONSE_ACCEPT:
+        if result == Gtk.ResponseType.ACCEPT:
             dsobject = chooser.get_selected_object()
         if cleanup_needed:
             chooser.destroy()
             del chooser
-    gobject.idle_add(action, dsobject)
+    GObject.idle_add(action, dsobject)
 
 
 def data_from_file(ta_file):
@@ -355,7 +350,7 @@ def data_from_file(ta_file):
     #
     try:
         data = pickle.load(file_handle)
-    except:
+    except BaseException:
         # Rewind necessary because of failed pickle.load attempt
         file_handle.seek(0)
         text = file_handle.read()
@@ -378,7 +373,25 @@ def data_from_string(text):
 
 def data_to_file(data, ta_file):
     ''' Write data to a file. '''
-    file_handle = file(ta_file, 'w')
+    try:
+        file_handle = file(ta_file, 'w')
+    except IOError as e:
+        error_output('Could not write to %s: %s.' % (ta_file, e))
+        tmp_file = os.path.join(os.path.expanduser('~'),
+                                os.path.basename(ta_file))
+        try:
+            debug_output('Trying to write to %s' % (tmp_file))
+            file_handle = file(tmp_file, 'w')
+        except IOError as e:
+            error_output('Could not write to %s: %s.' % (tmp_file, e))
+            tmp_file = os.path.join(tempfile.gettempdir(),
+                                    os.path.basename(ta_file))
+            try:
+                debug_output('Trying to write to %s' % (tmp_file))
+                file_handle = file(tmp_file, 'w')
+            except IOError as e:
+                error_output('Could not write to %s: %s.' % (tmp_file, e))
+                return
     file_handle.write(data_to_string(data))
     file_handle.close()
 
@@ -391,13 +404,16 @@ def data_to_string(data):
 def do_dialog(dialog, suffix, load_save_folder):
     ''' Open a file dialog. '''
     result = None
-    file_filter = gtk.FileFilter()
+    file_filter = Gtk.FileFilter()
     file_filter.add_pattern('*' + suffix)
     file_filter.set_name('Turtle Art')
     dialog.add_filter(file_filter)
-    dialog.set_current_folder(load_save_folder)
+
+    if load_save_folder is not None:
+        dialog.set_current_folder(load_save_folder)
+
     response = dialog.run()
-    if response == gtk.RESPONSE_OK:
+    if response == Gtk.ResponseType.OK:
         result = dialog.get_filename()
         load_save_folder = dialog.get_current_folder()
     dialog.destroy()
@@ -431,19 +447,20 @@ def get_canvas_data(canvas):
 
 def get_pixbuf_from_journal(dsobject, w, h):
     ''' Load a pixbuf from a Journal object. '''
-    try:
-        pixbuf = gtk.gdk.pixbuf_new_from_file_at_size(dsobject.file_path,
-                                                      int(w), int(h))
-    except:
+    if hasattr(dsobject, 'file_path'):
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(dsobject.file_path,
+                                                        int(w), int(h))
+    else:
+        pixbufloader = GdkPixbuf.PixbufLoader.new_with_mime_type('image/png')
+        pixbufloader.set_size(min(300, int(w)), min(225, int(h)))
         try:
-            pixbufloader = \
-                gtk.gdk.pixbuf_loader_new_with_mime_type('image/png')
-            pixbufloader.set_size(min(300, int(w)), min(225, int(h)))
             pixbufloader.write(dsobject.metadata['preview'])
-            pixbufloader.close()
-            pixbuf = pixbufloader.get_pixbuf()
-        except:
-            pixbuf = None
+        except Exception as e:
+            error_output('could not read preview: %s' % e, True)
+            return None
+        pixbufloader.close()
+        pixbuf = pixbufloader.get_pixbuf()
+
     return pixbuf
 
 
@@ -483,24 +500,34 @@ def base64_to_image(data, path_name):
 
 def movie_media_type(name):
     ''' Is it movie media? '''
-    return name.lower().endswith(('.ogv', '.vob', '.mp4', '.wmv', '.mov',
-                                  '.mpeg', '.ogg', '.webm'))
+    guess = mimetypes.guess_type(name)
+    if guess[0] is None:
+        return False
+    return guess[0][0:5] == 'video'
 
 
 def audio_media_type(name):
     ''' Is it audio media? '''
-    return name.lower().endswith(('.oga', '.m4a'))
+    guess = mimetypes.guess_type(name)
+    if guess[0] is None:
+        return False
+    return guess[0][0:5] == 'audio'
 
 
 def image_media_type(name):
     ''' Is it image media? '''
-    return name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.tiff',
-                                  '.tif', '.svg'))
+    guess = mimetypes.guess_type(name)
+    if guess[0] is None:
+        return False
+    return guess[0][0:5] == 'image'
 
 
 def text_media_type(name):
     ''' Is it text media? '''
-    return name.lower().endswith(('.txt', '.py', '.lg', '.rtf'))
+    guess = mimetypes.guess_type(name)
+    if guess[0] is None:
+        return False
+    return guess[0][0:4] == 'text'
 
 
 def round_int(num):
@@ -803,6 +830,26 @@ def find_blk_below(blk, namelist):
     return None
 
 
+def get_stack_width_and_height(blk):
+    ''' What are the width and height of a stack? '''
+    minx = 10000
+    miny = 10000
+    maxx = -10000
+    maxy = -10000
+    for gblk in find_group(blk):
+        (x, y) = gblk.spr.get_xy()
+        w, h = gblk.spr.get_dimensions()
+        if x < minx:
+            minx = x
+        if y < miny:
+            miny = y
+        if x + w > maxx:
+            maxx = x + w
+        if y + h > maxy:
+            maxy = y + h
+    return(maxx - minx, maxy - miny)
+
+
 def get_stack_name(blk):
     ''' Return the name of the action stack that the given block belongs to.
     If the top block of this stack is not a stack-defining block, return
@@ -861,15 +908,18 @@ def _get_dmi(node):
     path = os.path.join('/sys/class/dmi/id', node)
     try:
         return open(path).readline().strip()
-    except:
+    except BaseException:
         return None
 
 
 def get_screen_dpi():
     ''' Return screen DPI '''
-    xft_dpi = gtk.settings_get_default().get_property('gtk-xft-dpi')
-    dpi = float(xft_dpi / 1024)
-    return dpi
+    try:
+        xft_dpi = Gtk.settings_get_default().get_property('gtk-xft-dpi')
+        dpi = float(xft_dpi / 1024)
+        return dpi
+    except BaseException:
+        return 100
 
 
 def check_output(command, warning):
@@ -900,8 +950,6 @@ def power_manager_off(status):
          power_manager_off(True) --> Disable power manager
          power_manager_off(False) --> Use custom power manager
     '''
-    if not HAS_GCONF:
-        return
 
     global FIRST_TIME
 
@@ -910,12 +958,12 @@ def power_manager_off(status):
     OHM_SERVICE_IFACE = 'org.freedesktop.ohm.Keystore'
     PATH = '/etc/powerd/flags/inhibit-suspend'
 
-    client = gconf.client_get_default()
+    settings = Gio.Settings('org.sugarlabs.power');
 
     ACTUAL_POWER = True
 
     if FIRST_TIME:
-        ACTUAL_POWER = client.get_bool('/desktop/sugar/power/automatic')
+        ACTUAL_POWER = settings.get_boolean('automatic')
         FIRST_TIME = False
 
     if status:
@@ -923,10 +971,7 @@ def power_manager_off(status):
     else:
         VALUE = ACTUAL_POWER
 
-    try:
-        client.set_bool('/desktop/sugar/power/automatic', VALUE)
-    except gconf.GError:
-        pass
+    settings.set_bool('automatic', VALUE)
 
     bus = dbus.SystemBus()
     try:
@@ -945,3 +990,18 @@ def power_manager_off(status):
                 os.remove(PATH)
             except OSError:
                 pass
+
+
+def is_writeable(path):
+    ''' Make sure we can write to the directory or file '''
+    return os.access(path, os.W_OK)
+    """
+    if not os.path.exists(path):
+        return False
+    stats = os.stat(path)
+    if (stats.st_uid == os.geteuid() and stats.st_mode & stat.S_IWUSR) or \
+       (stats.st_gid == os.getegid() and stats.st_mode & stat.S_IWGRP) or \
+       (stats.st_mode & stat.S_IWOTH):
+        return True
+    return False
+    """

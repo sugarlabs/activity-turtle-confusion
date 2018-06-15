@@ -1,22 +1,23 @@
-#Copyright (c) 2013 Marion Zepf
+# Copyright (c) 2013 Marion Zepf
+# Copyright (c) 2014 Walter Bender
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 import ast
 from gettext import gettext as _
@@ -24,15 +25,18 @@ from math import sqrt
 from random import uniform
 import traceback
 
-#from ast_pprint import * # only used for debugging, safe to comment out
+# from ast_pprint import * # only used for debugging, safe to comment out
+
 
 from tablock import Media
+
 from tacanvas import TurtleGraphics
-from taconstants import (Color, CONSTANTS)
+from taconstants import (Color, CONSTANTS, ColorObj, Vector)
 from talogo import (LogoCode, logoerror, NegativeRootError)
 from taturtle import (Turtle, Turtles)
 from TurtleArt.tatype import (TYPE_CHAR, TYPE_INT, TYPE_FLOAT, TYPE_OBJECT,
                               TYPE_MEDIA, TYPE_COLOR, BOX_AST, ACTION_AST,
+                              TYPE_VECTOR,
                               Type, TypeDisjunction, TATypeError, get_type,
                               TypedSubscript, TypedName, is_bound_method,
                               is_instancemethod, is_staticmethod,
@@ -43,6 +47,7 @@ from util import ast_extensions
 
 
 class PyExportError(BaseException):
+
     """ Error that is raised when something goes wrong while converting the
     blocks to python code """
 
@@ -60,6 +65,7 @@ class PyExportError(BaseException):
 
 
 class Primitive(object):
+
     """ Something that can be called when the block code is executed in TA,
     but that can also be transformed into a Python AST."""
 
@@ -414,6 +420,13 @@ class Primitive(object):
                 slice=ast.Index(value=new_arg_asts[0]), ctx=ast.Load)
             call_ast = get_call_ast('logo.icall', [stack_func])
             return [call_ast, ast_yield_true()]
+        elif self == LogoCode.prim_invoke_return_stack:
+            # FIXME: Need to return value
+            stack_func = ast.Subscript(
+                value=ACTION_AST,
+                slice=ast.Index(value=new_arg_asts[0]), ctx=ast.Load)
+            call_ast = get_call_ast('logo.icall', [stack_func])
+            return [call_ast, ast_yield_true()]
 
         # stop stack
         elif self == LogoCode.prim_stop_stack:
@@ -453,7 +466,7 @@ class Primitive(object):
         # f(x)
         elif self == LogoCode.prim_myfunction:
             param_asts = []
-            for id_ in ['x', 'y', 'z'][:len(new_arg_asts)-1]:
+            for id_ in ['x', 'y', 'z'][:len(new_arg_asts) - 1]:
                 param_asts.append(ast.Name(id=id_, ctx=ast.Param))
             func_ast = ast_extensions.LambdaWithStrBody(
                 body_str=new_arg_asts[0].s, args=param_asts)
@@ -700,6 +713,11 @@ class Primitive(object):
             (arg1, arg2) = arg1
         if arg2 is None:
             return + arg1
+        elif isinstance(arg1, Vector) and isinstance(arg2, Vector):
+            vector = []
+            for i in range(len(arg1.vector)):
+                vector.append(arg1.vector[i] + arg2.vector[i])
+            return Vector(arg1.name, vector)
         else:
             return arg1 + arg2
 
@@ -709,18 +727,48 @@ class Primitive(object):
         arguments are given, subtract the second from the first. """
         if arg2 is None:
             return - arg1
+        elif isinstance(arg1, Vector) and isinstance(arg2, Vector):
+            vector = []
+            for i in range(len(arg1.vector)):
+                vector.append(arg1.vector[i] - arg2.vector[i])
+            return Vector(arg1.name, vector)
         else:
             return arg1 - arg2
 
     @staticmethod
     def multiply(arg1, arg2):
         """ Multiply the two arguments """
-        return arg1 * arg2
+        if isinstance(arg1, Vector) and isinstance(arg2, (int, float)):
+            vector = []
+            for i in range(len(arg1.vector)):
+                vector.append(arg1.vector[i] * arg2)
+            return Vector(arg1.name, vector)
+        elif isinstance(arg2, Vector) and isinstance(arg1, (int, float)):
+            vector = []
+            for i in range(len(arg2.vector)):
+                vector.append(arg2.vector[i] * arg1)
+            return Vector(arg2.name, vector)
+        else:
+            return arg1 * arg2
 
     @staticmethod
     def divide(arg1, arg2):
         """ Divide the first argument by the second """
-        return float(arg1) / arg2
+        if arg2 == 0:
+            raise logoerror("#zerodivide")
+
+        if isinstance(arg1, Vector) and isinstance(arg2, (int, float)):
+            vector = []
+            for i in range(len(arg1.vector)):
+                vector.append(arg1.vector[i] / arg2)
+            return Vector(arg1.name, vector)
+        elif isinstance(arg2, Vector) and isinstance(arg1, (int, float)):
+            vector = []
+            for i in range(len(arg2.vector)):
+                vector.append(arg2.vector[i] / arg1)
+            return Vector(arg2.name, vector)
+        else:
+            return float(arg1) / arg2
 
     @staticmethod
     def modulo(arg1, arg2):
@@ -761,17 +809,29 @@ class Primitive(object):
     @staticmethod
     def equals(arg1, arg2):
         """ Return arg1 == arg2 """
-        return arg1 == arg2
+        # See comment in tatype.py TYPE_BOX -> TYPE_COLOR
+        if isinstance(arg1, ColorObj) or isinstance(arg2, ColorObj):
+            return str(arg1) == str(arg2)
+        else:
+            return arg1 == arg2
 
     @staticmethod
     def less(arg1, arg2):
         """ Return arg1 < arg2 """
-        return arg1 < arg2
+        # See comment in tatype.py TYPE_BOX -> TYPE_COLOR
+        if isinstance(arg1, ColorObj) or isinstance(arg2, ColorObj):
+            return float(arg1) < float(arg2)
+        else:
+            return arg1 < arg2
 
     @staticmethod
     def greater(arg1, arg2):
         """ Return arg1 > arg2 """
-        return arg1 > arg2
+        # See comment in tatype.py TYPE_BOX -> TYPE_COLOR
+        if isinstance(arg1, ColorObj) or isinstance(arg2, ColorObj):
+            return float(arg1) > float(arg2)
+        else:
+            return arg1 > arg2
 
     @staticmethod
     def comment(text):
@@ -795,6 +855,7 @@ class Primitive(object):
 
 
 class Disjunction(tuple):
+
     """ Abstract disjunction class (not to be instantiated directly) """
 
     def __init__(self, iterable):
@@ -815,6 +876,7 @@ class Disjunction(tuple):
 
 
 class PrimitiveDisjunction(Disjunction, Primitive):
+
     """ Disjunction of two or more Primitives. PrimitiveDisjunctions may not
     be nested. """
 
@@ -851,11 +913,13 @@ class PrimitiveDisjunction(Disjunction, Primitive):
 
 
 class ArgListDisjunction(Disjunction):
+
     """ Disjunction of two or more argument lists """
     pass
 
 
 class ArgSlot(object):
+
     """ Description of the requirements that a Primitive demands from an
     argument or keyword argument. An ArgSlot is filled at runtime, based
     on the block program structure. """
@@ -1051,11 +1115,13 @@ class ArgSlot(object):
 
 
 class ArgSlotDisjunction(Disjunction, ArgSlot):
+
     """ Disjunction of two or more argument slots """
     pass
 
 
 class ConstantArg(object):
+
     """ A constant argument or keyword argument to a Primitive. It is
     independent of the block program structure. """
 
@@ -1154,6 +1220,12 @@ def value_to_ast(value, *args_for_prim, **kwargs_for_prim):
         return get_call_ast('Color', [value.name, value.color,
                                       value.shade, value.gray],
                             return_type=TYPE_COLOR)
+    # vector
+    elif isinstance(value, Vector):
+        # call to the Vector constructor with this object's values,
+        # e.g., Vector('banana', [105, 1, 27, 3, 0])
+        return get_call_ast('Vector', [value.name, value.vector],
+                            return_type=TYPE_VECTOR)
     # media
     elif isinstance(value, Media):
         args = [value_to_ast(value.type), value_to_ast(value.value)]

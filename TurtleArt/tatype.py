@@ -1,32 +1,34 @@
-#Copyright (c) 2013 Marion Zepf
+# Copyright (c) 2013 Marion Zepf
+# Copyright (c) 2014 Walter Bender
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 """ type system for Primitives and their arguments """
 
 import ast
 
 from tablock import Media
-from taconstants import (Color, CONSTANTS)
+from taconstants import (Color, ColorObj, CONSTANTS, Vector)
 
 
 class Type(object):
+
     """ A type in the type hierarchy. """
 
     def __init__(self, constant_name, value):
@@ -49,7 +51,8 @@ class Type(object):
     __repr__ = __str__
 
 
-class TypeDisjunction(tuple,Type):
+class TypeDisjunction(tuple, Type):
+
     """ Disjunction of two or more Types (from the type hierarchy) """
 
     def __init__(self, iterable):
@@ -67,21 +70,22 @@ class TypeDisjunction(tuple,Type):
 
 # individual types
 TYPE_OBJECT = Type('TYPE_OBJECT', 0)
-TYPE_BOOL = Type('TYPE_BOOL', 5)
-TYPE_BOX = Type('TYPE_BOX', 8)  # special type for the unknown content of a box
 TYPE_CHAR = Type('TYPE_CHAR', 1)
 TYPE_COLOR = Type('TYPE_COLOR', 2)
 TYPE_FLOAT = Type('TYPE_FLOAT', 3)
 TYPE_INT = Type('TYPE_INT', 4)
-TYPE_MEDIA = Type('TYPE_MEDIA', 10)
-TYPE_NUMBER = Type('TYPE_NUMBER', 6)  # shortcut to avoid a TypeDisjunction
-    # between TYPE_FLOAT and TYPE_INT
+TYPE_BOOL = Type('TYPE_BOOL', 5)
+# shortcut to avoid a TypeDisjunction between TYPE_FLOAT and TYPE_INT
+TYPE_NUMBER = Type('TYPE_NUMBER', 6)
 TYPE_NUMERIC_STRING = Type('TYPE_NUMERIC_STRING', 7)
+TYPE_BOX = Type('TYPE_BOX', 8)  # special type for the unknown content of a box
 TYPE_STRING = Type('TYPE_STRING', 9)
+TYPE_MEDIA = Type('TYPE_MEDIA', 10)
+# An array of numbers used by the food plugin et al.
+TYPE_VECTOR = Type('TYPE_VECTOR', 11)
 
 # groups/ classes of types
 TYPES_NUMERIC = (TYPE_FLOAT, TYPE_INT, TYPE_NUMBER)
-
 
 BOX_AST = ast.Name(id='BOX', ctx=ast.Load)
 ACTION_AST = ast.Name(id='ACTION', ctx=ast.Load)
@@ -109,6 +113,8 @@ def get_type(x):
         return (TYPE_COLOR, False)
     elif isinstance(x, Media):
         return (TYPE_MEDIA, False)
+    elif isinstance(x, Vector):
+        return (TYPE_VECTOR, False)
     elif hasattr(x, "return_type"):
         return (x.return_type, False)
 
@@ -170,9 +176,11 @@ def is_instancemethod(method):
     # TODO how to access the type `instancemethod` directly?
     return type(method).__name__ == "instancemethod"
 
+
 def is_bound_method(method):
     return ((is_instancemethod(method) and method.im_self is not None) or
             (hasattr(method, '__self__') and method.__self__ is not None))
+
 
 def is_staticmethod(method):
     # TODO how to access the type `staticmethod` directly?
@@ -182,6 +190,7 @@ def is_staticmethod(method):
 def identity(x):
     return x
 
+
 TYPE_CONVERTERS = {
     # Type hierarchy: If there is a converter A -> B, then A is a subtype of B.
     # The converter from A to B is stored under TYPE_CONVERTERS[A][B].
@@ -189,6 +198,8 @@ TYPE_CONVERTERS = {
     # converting A -> C must yield the same result as converting A -> B -> C.
     # TYPE_OBJECT is the supertype of everything.
     TYPE_BOX: {
+        TYPE_COLOR: ColorObj,  # FIXME: should be Color.name
+        TYPE_VECTOR: Vector,
         TYPE_FLOAT: float,
         TYPE_INT: int,
         TYPE_NUMBER: float,
@@ -220,6 +231,7 @@ TYPE_CONVERTERS = {
 
 
 class TATypeError(BaseException):
+
     """ TypeError with the types from the hierarchy, not with Python types """
 
     def __init__(self, bad_value, bad_type=None, req_type=None, message=''):
@@ -330,9 +342,13 @@ def convert(x, new_type, old_type=None, converter=None):
         converter = get_converter(old_type, new_type)
         if converter is None:
             # no converter available
-            raise TATypeError(bad_value=x, bad_type=old_type,
-                              req_type=new_type, message=("found no converter"
-                                  " for this type combination"))
+            raise TATypeError(
+                bad_value=x,
+                bad_type=old_type,
+                req_type=new_type,
+                message=(
+                    "found no converter"
+                    " for this type combination"))
 
     def _apply_converter(converter, y):
         try:
@@ -352,7 +368,7 @@ def convert(x, new_type, old_type=None, converter=None):
         except BaseException:
             raise TATypeError(bad_value=x, bad_type=old_type,
                               req_type=new_type, message=("error during "
-                                  "conversion"))
+                                                          "conversion"))
 
     if isinstance(converter, (list, tuple)):
         # apply the converter chain recursively
@@ -374,11 +390,12 @@ class TypedAST(ast.AST):
             return self._return_type
 
 
-class TypedCall(ast.Call,TypedAST):
+class TypedCall(ast.Call, TypedAST):
+
     """ Like a Call AST, but with a return type """
 
     def __init__(self, func, args=None, keywords=None, starargs=None,
-            kwargs=None, return_type=None):
+                 kwargs=None, return_type=None):
 
         if args is None:
             args = []
@@ -386,12 +403,13 @@ class TypedCall(ast.Call,TypedAST):
             keywords = []
 
         ast.Call.__init__(self, func=func, args=args, keywords=keywords,
-            starargs=starargs, kwargs=kwargs)
+                          starargs=starargs, kwargs=kwargs)
 
         self._return_type = return_type
 
 
-class TypedSubscript(ast.Subscript,TypedAST):
+class TypedSubscript(ast.Subscript, TypedAST):
+
     """ Like a Subscript AST, but with a type """
 
     def __init__(self, value, slice_, ctx=ast.Load, return_type=None):
@@ -401,7 +419,8 @@ class TypedSubscript(ast.Subscript,TypedAST):
         self._return_type = return_type
 
 
-class TypedName(ast.Name,TypedAST):
+class TypedName(ast.Name, TypedAST):
+
     """ Like a Name AST, but with a type """
 
     def __init__(self, id_, ctx=ast.Load, return_type=None):
@@ -434,8 +453,8 @@ def get_call_ast(func_name, args=None, kwargs=None, return_type=None):
     # if no return type is given, return a simple Call AST
     if return_type is None:
         return ast.Call(func=func_ast, args=args, keywords=keywords,
-            starargs=None, kwargs=None)
+                        starargs=None, kwargs=None)
     # if a return type is given, return a TypedCall AST
     else:
         return TypedCall(func=func_ast, args=args, keywords=keywords,
-            return_type=return_type)
+                         return_type=return_type)

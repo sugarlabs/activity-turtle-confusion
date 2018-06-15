@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#Copyright (c) 2011, 2012 Walter Bender
+# Copyright (c) 2011, 2012 Walter Bender
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,8 +15,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-import gst
-import gtk
+
+import gi
+gi.require_version("Gst", "1.0")
+from gi.repository import Gst
+Gst.init(None)
 from fcntl import ioctl
 import os
 from time import time
@@ -31,7 +34,7 @@ from plugins.plugin import Plugin
 
 from TurtleArt.tapalette import make_palette
 from TurtleArt.talogo import media_blocks_dictionary
-from TurtleArt.tautils import get_path, debug_output
+from TurtleArt.tautils import get_path, debug_output, power_manager_off
 from TurtleArt.taconstants import MEDIA_SHAPES, NO_IMPORT, SKIN_PATHS, \
     BLOCKS_WITH_SKIN
 from TurtleArt.taprimitive import (ConstantArg, Primitive)
@@ -65,7 +68,7 @@ class Camera_sensor(Plugin):
         sensors_palette = make_palette('sensor',
                                        colors=["#FF6060", "#A06060"],
                                        help_string=_(
-                'Palette of sensor blocks'),
+                                           'Palette of sensor blocks'),
                                        position=6)
         '''
         media_palette = make_palette('media',
@@ -80,108 +83,63 @@ class Camera_sensor(Plugin):
 
         SKIN_PATHS.append('plugins/camera_sensor/images')
 
+        hidden = True
+        second_cam = False
         if self._status:
-            sensors_palette.add_block('luminance',
-                                      hidden=True,
-                                      style='box-style',
-                                      label=_('brightness'),
-                                      help_string=_(
-                    'light level detected by camera'),
-                                      value_block=True,
-                                      prim_name='luminance')
-            self._parent.lc.def_prim(
-                'luminance', 0,
-                Primitive(self.prim_read_camera,
-                          return_type=TYPE_NUMBER,
-                          kwarg_descs={'luminance_only': ConstantArg(True)},
-                          call_afterwards=self.after_luminance))
-
-            # Depreciated block
-            sensors_palette.add_block('read_camera',
-                                      hidden=True,
-                                      style='box-style',
-                                      label=_('brightness'),
-                                      help_string=_(
-                    'Average RGB color from camera \
-is pushed to the stack'),
-                                      value_block=True,
-                                      prim_name='read_camera')
-            self._parent.lc.def_prim(
-                'read_camera', 0,
-                Primitive(self.prim_read_camera,
-                          kwarg_descs={'luminance_only': ConstantArg(False)}))
-
-            media_palette.add_block('camera',
-                                    hidden=True,
-                                    style='box-style-media',
-                                    label=' ',
-                                    default='CAMERA',
-                                    help_string=_('camera output'),
-                                    content_block=True)
+            hidden = False
             if len(self.devices) > 1:
-                media_palette.add_block('camera1',
-                                        hidden=True,
-                                        style='box-style-media',
-                                        label=' ',
-                                        default='CAMERA',
-                                        help_string=_('camera output'),
-                                        content_block=True)
-            else:
-                media_palette.add_block('camera1',
-                                        hidden=True,
-                                        style='box-style-media',
-                                        label=' ',
-                                        default='CAMERA',
-                                        help_string=_('camera output'),
-                                        content_block=True)
+                second_cam = True
 
-        else:  # No camera, so blocks should do nothing
-            sensors_palette.add_block('luminance',
-                                      hidden=True,
-                                      style='box-style',
-                                      label=_('brightness'),
-                                      help_string=\
-                                          _('light level detected by camera'),
-                                      value_block=True,
-                                      prim_name='read_camera')
-            self._parent.lc.def_prim(
-                'luminance', 0,
-                Primitive(self.prim_read_camera,
-                          return_type=TYPE_NUMBER,
-                          kwarg_descs={'luminance_only': ConstantArg(True)},
-                          call_afterwards=self.after_luminance))
+        # ++ Turtle Confusion
+        hidden = True
+        second_cam = False
+        # -- Turtle Confusion
 
-            # Depreciated block
-            sensors_palette.add_block('read_camera',
-                                      hidden=True,
-                                      style='box-style',
-                                      label=_('brightness'),
-                                      help_string=_(
-                    'Average RGB color from camera \
-is pushed to the stack'),
-                                      value_block=True,
-                                      prim_name='read_camera')
-            self._parent.lc.def_prim(
-                'read_camera', 0,
-                Primitive(self.prim_read_camera,
-                          return_type=TYPE_NUMBER,
-                          kwarg_descs={'luminance_only': ConstantArg(False)}))
+        sensors_palette.add_block('luminance',
+                                  hidden=hidden,
+                                  style='box-style',
+                                  label=_('brightness'),
+                                  help_string=_(
+                                      'light level detected by camera'),
+                                  value_block=True,
+                                  prim_name='luminance')
+        self._parent.lc.def_prim(
+            'luminance', 0,
+            Primitive(self.prim_read_camera,
+                      return_type=TYPE_NUMBER,
+                      kwarg_descs={'luminance_only': ConstantArg(True)},
+                      call_afterwards=self.after_luminance))
 
-            media_palette.add_block('camera',
-                                    hidden=True,
-                                    style='box-style-media',
-                                    label=' ',
-                                    default='CAMERA',
-                                    help_string=_('camera output'),
-                                    content_block=True)
+        media_palette.add_block('camera',
+                                hidden=hidden,
+                                style='box-style-media',
+                                label=' ',
+                                default='CAMERA',
+                                help_string=_('camera output'),
+                                content_block=True)
 
-            media_palette.add_block('camera1',
-                                    hidden=True,
-                                    style='box-style-media',
-                                    label=' ',
-                                    default='CAMERA',
-                                    help_string=_('camera output'),
-                                    content_block=True)
+        media_palette.add_block('camera1',
+                                hidden=not(second_cam),
+                                style='box-style-media',
+                                label=' ',
+                                default='CAMERA',
+                                help_string=_('camera output'),
+                                content_block=True)
+
+        # Depreciated block
+        sensors_palette.add_block(
+            'read_camera',
+            hidden=True,
+            style='box-style',
+            label=_('brightness'),
+            help_string=_('Average RGB color from camera is pushed to the stack'),
+            value_block=True,
+            prim_name='read_camera')
+        self._parent.lc.def_prim(
+            'read_camera', 0,
+            Primitive(self.prim_read_camera,
+                      return_type=TYPE_NUMBER,
+                      kwarg_descs={'luminance_only': ConstantArg(False)}))
 
         NO_IMPORT.append('camera')
         BLOCKS_WITH_SKIN.append('camera')
@@ -194,11 +152,13 @@ is pushed to the stack'),
 
     def start(self):
         ''' Initialize the camera if there is an camera block in use '''
-        if len(self._parent.block_list.get_similar_blocks('block',
-            ['camera', 'camera1', 'read_camera', 'luminance'])) > 0:
+        camera_blocks = len(self._parent.block_list.get_similar_blocks(
+            'block', ['camera', 'camera1', 'read_camera', 'luminance']))
+        if not self._parent.running_turtleart or camera_blocks > 0:
             if self._status and len(self.cameras) == 0:
                 for device in self.devices:
                     self.cameras.append(Camera(device))
+                power_manager_off(True)
 
     def quit(self):
         ''' This gets called when the activity quits '''
@@ -217,6 +177,7 @@ is pushed to the stack'),
             for i, camera in enumerate(self.cameras):
                 camera.stop_camera_input()
                 self._set_autogain(1, camera=i)  # enable AUTOGAIN
+            power_manager_off(False)
 
     def _status_report(self):
         debug_output('Reporting camera status: %s' % (str(self._status)),
@@ -248,7 +209,6 @@ is pushed to the stack'),
                 self._parent.lc.heap.append(-1)
                 self._parent.lc.heap.append(-1)
                 return
-
         array = None
         self._set_autogain(0, camera=camera)  # disable AUTOGAIN
         self._get_pixbuf_from_camera(camera=camera)
@@ -269,8 +229,8 @@ is pushed to the stack'),
         if array is not None:
             length = int(len(array) / 3)
             if length != width * height:
-                debug_output('array length != width x height (%d != %dx%d)' % \
-                                 (length, width, height),
+                debug_output('array length != width x height (%d != %dx%d)' %
+                             (length, width, height),
                              self._parent.running_sugar)
 
             # Average the 100 pixels in the center of the screen
@@ -311,7 +271,7 @@ is pushed to the stack'),
             return
         try:
             video_capture_device = open(self.devices[camera], 'rw')
-        except:
+        except BaseException:
             video_capture_device = None
             debug_output('video capture device not available',
                          self._parent.running_sugar)
@@ -321,7 +281,7 @@ is pushed to the stack'),
             ioctl(video_capture_device, VIDIOC_G_CTRL, self._ag_control)
             self._ag_control.value = state
             ioctl(video_capture_device, VIDIOC_S_CTRL, self._ag_control)
-        except:
+        except BaseException:
             pass
         video_capture_device.close()
 

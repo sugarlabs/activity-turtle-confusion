@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#Copyright (c) 2011 Walter Bender
+# Copyright (c) 2011 Walter Bender
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -50,20 +50,14 @@ class Accelerometer(Plugin):
                                help_string=_('Palette of extra options'),
                                position=8,
                                translation=_('extras'))
-        '''
-        palette = make_palette('sensor',
-                               colors=["#FF6060", "#A06060"],
-                               help_string=_('Palette of sensor blocks'),
-                               position=6)
-        '''
 
         if self._status:
             palette.add_block('xyz',
-                              hidden=True,
+                              hidden=True
                               style='basic-style-extended-vertical',
                               label=_('acceleration'),
-                              help_string=\
-                                  _('push acceleration in x, y, z to heap'),
+                              help_string=_(
+                                  'push acceleration in x, y, z to heap'),
                               prim_name='xyz')
         else:
             palette.add_block('xyz',

@@ -1,25 +1,25 @@
 #!/usr/bin/env python
-#Copyright (c) 2011 Walter Bender
-#Copyright (c) 2010 Jamie Boisture
-#Copyright (c) 2011 Collabora Ltd. <http://www.collabora.co.uk/>
+# Copyright (c) 2011 Walter Bender
+# Copyright (c) 2010 Jamie Boisture
+# Copyright (c) 2011 Collabora Ltd. <http://www.collabora.co.uk/>
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 #!/usr/bin/python
 
@@ -27,17 +27,17 @@ try:
     import pycurl
     import xmlrpclib
     _UPLOAD_AVAILABLE = True
-except ImportError, e:
+except ImportError as e:
     print "Import Error: %s. Project upload is disabled." % (e)
     _UPLOAD_AVAILABLE = False
 
 import os
-import gtk
 
 from plugin import Plugin
-from util.menubuilder import MenuBuilder, MENUBAR
+from TurtleArt.util.menubuilder import make_menu_item, make_sub_menu, MENUBAR
 
 from gettext import gettext as _
+from gi.repository import Gtk
 
 
 class Uploader_plugin(Plugin):
@@ -64,13 +64,13 @@ class Uploader_plugin(Plugin):
             menu, upload_menu = MENUBAR[_('Upload')]
         else:
             upload_menu = None
-            menu = gtk.Menu()
-        MenuBuilder.make_menu_item(menu, _('Upload to Web'),
-                                   self.do_upload_to_web)
+            menu = Gtk.Menu()
+        make_menu_item(menu, _('Upload to Web'),
+                       self.do_upload_to_web)
         if upload_menu is not None:
             return None  # We don't have to add it since it already exists
         else:
-            upload_menu = MenuBuilder.make_sub_menu(menu, _('Upload'))
+            upload_menu = make_sub_menu(menu, _('Upload'))
             return upload_menu
 
     def enabled(self):
@@ -81,32 +81,32 @@ class Uploader_plugin(Plugin):
             return
 
         self.uploading = False
-        self.pop_up = gtk.Window()
+        self.pop_up = Gtk.Window()
         self.pop_up.set_default_size(600, 400)
         self.pop_up.connect('delete_event', self._stop_uploading)
-        table = gtk.Table(8, 1, False)
+        table = Gtk.Table(8, 1, False)
         self.pop_up.add(table)
 
-        login_label = gtk.Label(_('You must have an account at \
+        login_label = Gtk.Label(_('You must have an account at \
 http://turtleartsite.sugarlabs.org to upload your project.'))
         table.attach(login_label, 0, 1, 0, 1)
-        self.login_message = gtk.Label('')
+        self.login_message = Gtk.Label('')
         table.attach(self.login_message, 0, 1, 1, 2)
 
-        self.Hbox1 = gtk.HBox()
+        self.Hbox1 = Gtk.HBox()
         table.attach(self.Hbox1, 0, 1, 2, 3, xpadding=5, ypadding=3)
-        self.username_entry = gtk.Entry()
-        username_label = gtk.Label(_('Username:') + ' ')
+        self.username_entry = Gtk.Entry()
+        username_label = Gtk.Label(_('Username:') + ' ')
         username_label.set_size_request(150, 25)
         username_label.set_alignment(1.0, 0.5)
         self.username_entry.set_size_request(450, 25)
         self.Hbox1.add(username_label)
         self.Hbox1.add(self.username_entry)
 
-        self.Hbox2 = gtk.HBox()
+        self.Hbox2 = Gtk.HBox()
         table.attach(self.Hbox2, 0, 1, 3, 4, xpadding=5, ypadding=3)
-        self.password_entry = gtk.Entry()
-        password_label = gtk.Label(_('Password:') + ' ')
+        self.password_entry = Gtk.Entry()
+        password_label = Gtk.Label(_('Password:') + ' ')
         self.password_entry.set_visibility(False)
         password_label.set_size_request(150, 25)
         password_label.set_alignment(1.0, 0.5)
@@ -114,34 +114,34 @@ http://turtleartsite.sugarlabs.org to upload your project.'))
         self.Hbox2.add(password_label)
         self.Hbox2.add(self.password_entry)
 
-        self.Hbox3 = gtk.HBox()
+        self.Hbox3 = Gtk.HBox()
         table.attach(self.Hbox3, 0, 1, 4, 5, xpadding=5, ypadding=3)
-        self.title_entry = gtk.Entry()
-        title_label = gtk.Label(_('Title:') + ' ')
+        self.title_entry = Gtk.Entry()
+        title_label = Gtk.Label(_('Title:') + ' ')
         title_label.set_size_request(150, 25)
         title_label.set_alignment(1.0, 0.5)
         self.title_entry.set_size_request(450, 25)
         self.Hbox3.add(title_label)
         self.Hbox3.add(self.title_entry)
 
-        self.Hbox4 = gtk.HBox()
+        self.Hbox4 = Gtk.HBox()
         table.attach(self.Hbox4, 0, 1, 5, 6, xpadding=5, ypadding=3)
-        self.description_entry = gtk.TextView()
-        description_label = gtk.Label(_('Description:') + ' ')
+        self.description_entry = Gtk.TextView()
+        description_label = Gtk.Label(_('Description:') + ' ')
         description_label.set_size_request(150, 25)
         description_label.set_alignment(1.0, 0.5)
-        self.description_entry.set_wrap_mode(gtk.WRAP_WORD)
+        self.description_entry.set_wrap_mode(Gtk.WrapMode.WORD)
         self.description_entry.set_size_request(450, 50)
         self.Hbox4.add(description_label)
         self.Hbox4.add(self.description_entry)
 
-        self.Hbox5 = gtk.HBox()
+        self.Hbox5 = Gtk.HBox()
         table.attach(self.Hbox5, 0, 1, 6, 7, xpadding=5, ypadding=3)
-        self.submit_button = gtk.Button(_('Submit to Web'))
+        self.submit_button = Gtk.Button(_('Submit to Web'))
         self.submit_button.set_size_request(300, 25)
         self.submit_button.connect('pressed', self._do_remote_logon)
         self.Hbox5.add(self.submit_button)
-        self.cancel_button = gtk.Button(_('Cancel'))
+        self.cancel_button = Gtk.Button(_('Cancel'))
         self.cancel_button.set_size_request(300, 25)
         self.cancel_button.connect('pressed', self._stop_uploading)
         self.Hbox5.add(self.cancel_button)
@@ -205,12 +205,13 @@ http://turtleartsite.sugarlabs.org to upload your project.'))
             self.pop_up.hide()
             self.uploading = False
 
+
 if __name__ == "__main__":
     # TODO: create test data...
     u = Uploader_plugin(None)
     if u.enabled():
         print "Uploader is enabled... trying to upload"
         u.do_upload_to_web()
-        gtk.main()
+        Gtk.main()
     else:
         print "Uploader is not enabled... exiting"

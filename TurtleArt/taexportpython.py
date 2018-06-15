@@ -1,33 +1,34 @@
-#Copyright (c) 2013 Marion Zepf
+# Copyright (c) 2013 Marion Zepf
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 """ Python export tool """
 
 import ast
 from gettext import gettext as _
 from os import linesep
+from os import path, pardir
 import re
 import traceback
 import util.codegen as codegen
 
-#from ast_pprint import * # only used for debugging, safe to comment out
+# from ast_pprint import * # only used for debugging, safe to comment out
 
 from talogo import LogoCode
 from taprimitive import (ast_yield_true, Primitive, PyExportError,
@@ -41,24 +42,32 @@ _SETUP_CODE_START = """\
 # -*- coding: utf-8 -*-
 
 _INSTALL_PATH = '/usr/share/sugar/activities/TurtleArt.activity'
-_ALTERNATIVE_INSTALL_PATH = \
+_ALTERNATIVE_INSTALL_PATH = \\
     '/usr/local/share/sugar/activities/TurtleArt.activity'
 
-import os, sys
+import os, sys, dbus
 paths = []
+
 paths.append('../%s.activity')
 paths.append(os.path.expanduser('~') + '/Activities/%s.activity')
 paths.append('/usr/share/sugar/activities/%s.activity')
 paths.append('/usr/local/share/sugar/activities/%s.activity')
+paths.append(
+    '/home/broot/sugar-build/build/install/share/sugar/activities/%s.activity')
+""" + \
+    "paths.append('%s')" % \
+    path.abspath(path.join(path.dirname(__file__), pardir)) + \
+    """\
 
 flag = False
 for path in paths:
-    for activity in ['TurtleBlocks', 'TurtleBots']:
-        p = path % activity
-        if os.path.exists(p):
+    for activity in ['TurtleBots', 'TurtleBlocks']:
+        p = (path % activity) if "%" in path else path
+
+        if os.path.exists(p) and p not in sys.path:
             flag = True
             sys.path.insert(0, p)
-    
+
 if not flag:
     print 'This code require the Turtle Blocks/Bots activity to be installed.'
     exit(1)
@@ -75,8 +84,12 @@ tw = get_tw()
 BOX = {}
 ACTION = {}
 
-
+global_objects = None
+turtles = None
+canvas = None
+logo = None
 """
+
 _SETUP_CODE_END = """\
 
 if __name__ == '__main__':
@@ -90,14 +103,15 @@ def %s():
 """
 _START_STACK_START_ADD = """\
     tw.start_plugins()
+    global global_objects,turtles,canvas,logo
     global_objects = tw.get_global_objects()
-"""
-_ACTION_STACK_PREAMBLE = """\
     turtles = tw.turtles
-    turtle = turtles.get_active_turtle()
     canvas = tw.canvas
     logo = tw.lc
-
+    logo.boxes = BOX
+"""
+_ACTION_STACK_PREAMBLE = """\
+    turtle = turtles.get_active_turtle()
 """
 _ACTION_STACK_END = """\
 ACTION["%s"] = %s
@@ -109,6 +123,13 @@ PAT_IDENTIFIER_ILLEGAL_CHAR = re.compile("[^A-Za-z0-9_]")
 def save_python(tw):
     """ Find all the action stacks and turn each into Python code """
     all_blocks = tw.just_blocks()
+    blocks_name = []
+    for block in all_blocks:
+        blocks_name.append(block.name)
+
+    if 'start' not in blocks_name:
+        return None
+
     blocks_covered = set()
     tops_of_stacks = []
     for block in all_blocks:
@@ -119,6 +140,12 @@ def save_python(tw):
             blocks_covered.update(set(block_stack))
 
     snippets = [_SETUP_CODE_START]
+
+    for k in plugins_in_use:
+        snippets.append('%s = None\n' % (k.lower(),))
+
+    snippets.append('\n')
+
     for block in tops_of_stacks:
         stack_name = get_stack_name(block)
         if stack_name:
@@ -126,10 +153,10 @@ def save_python(tw):
             snippets.append(pythoncode)
             snippets.append(linesep)
     snippets.append(_SETUP_CODE_END)
-    return "".join(snippets)
+    return ''.join(snippets)
 
 
-def _action_stack_to_python(block, tw, name="start"):
+def _action_stack_to_python(block, tw, name='start'):
     """ Turn a stack of blocks into Python code
     name -- the name of the action stack (defaults to "start") """
 
@@ -152,12 +179,13 @@ def _action_stack_to_python(block, tw, name="start"):
     if name == 'start':
         pre_preamble = _START_STACK_START_ADD
         for k in plugins_in_use:
+            pre_preamble += '    global %s\n' % (k.lower(),)
             pre_preamble += "    %s = global_objects['%s']\n" % (k.lower(), k)
     else:
         pre_preamble = ''
     generated_code = _indent(generated_code, 1)
     if generated_code.endswith(linesep):
-        newline = ""
+        newline = ''
     else:
         newline = linesep
     snippets = [_ACTION_STACK_START % (name_id),
@@ -166,7 +194,7 @@ def _action_stack_to_python(block, tw, name="start"):
                 generated_code,
                 newline,
                 _ACTION_STACK_END % (name, name_id)]
-    return "".join(snippets)
+    return ''.join(snippets)
 
 
 def _walk_action_stack(top_block, lc, convert_me=True):
@@ -195,7 +223,7 @@ def _walk_action_stack(top_block, lc, convert_me=True):
         prim = lc.get_prim_callable(block.primitive)
         # fail gracefully if primitive is not a Primitive object
         if not isinstance(prim, Primitive):
-            raise PyExportError(_("block is not exportable"), block=block)
+            raise PyExportError(_('block is not exportable'), block=block)
         return prim
 
     prim = _get_prim(block)
@@ -214,7 +242,7 @@ def _walk_action_stack(top_block, lc, convert_me=True):
                     new_ast = prim.get_ast(*arg_asts)
                 except ValueError:
                     traceback.print_exc()
-                    raise PyExportError(_("error while exporting block"),
+                    raise PyExportError(_('error while exporting block'),
                                         block=block)
                 if isinstance(new_ast, (list, tuple)):
                     ast_list.extend(new_ast)
@@ -269,10 +297,10 @@ def _walk_action_stack(top_block, lc, convert_me=True):
 def _make_identifier(name):
     """ Turn name into a Python identifier name by replacing illegal
     characters """
-    replaced = re.sub(PAT_IDENTIFIER_ILLEGAL_CHAR, "_", name)
+    replaced = re.sub(PAT_IDENTIFIER_ILLEGAL_CHAR, '_', name)
     # TODO find better strategy to avoid number at beginning
-    if re.match("[0-9]", replaced):
-        replaced = "_" + replaced
+    if re.match('[0-9]', replaced):
+        replaced = '_' + replaced
     return replaced
 
 

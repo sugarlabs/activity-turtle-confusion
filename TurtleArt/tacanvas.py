@@ -1,34 +1,38 @@
-#Copyright (c) 2007-8, Playful Invention Company.
-#Copyright (c) 2008-11, Walter Bender
-#Copyright (c) 2011 Collabora Ltd. <http://www.collabora.co.uk/>
+# Copyright (c) 2007-8, Playful Invention Company.
+# Copyright (c) 2008-11, Walter Bender
+# Copyright (c) 2011 Collabora Ltd. <http://www.collabora.co.uk/>
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
-import gtk
-from math import pi
-import os
-import pango
 import cairo
-import pangocairo
+import os
 
+from math import pi
+
+from gi.repository import Gtk
+from gi.repository import Gdk
+from gi.repository import Pango
+from gi.repository import PangoCairo
+from gi.repository import GObject
 from tautils import get_path
-from taconstants import Color, TMP_SVG_PATH
+from taconstants import (Color, TMP_SVG_PATH, DEFAULT_PEN_COLOR,
+                         DEFAULT_BACKGROUND_COLOR, DEFAULT_FONT)
 
 
 def wrap100(n):
@@ -97,6 +101,7 @@ COLOR_TABLE = (
 
 
 class TurtleGraphics:
+
     ''' A class for the Turtle graphics canvas '''
 
     def __init__(self, turtle_window, width, height):
@@ -105,8 +110,9 @@ class TurtleGraphics:
         self.width = width
         self.height = height
         self.textsize = 48
-        self._fgrgb = [255, 0, 0]
-        self._bgrgb = [255, 248, 222]
+        self._fgrgb = DEFAULT_PEN_COLOR
+        self._bgrgb = DEFAULT_BACKGROUND_COLOR
+        self._font = DEFAULT_FONT
         self._shade = 0
         self._color = 0
         self._gray = 100
@@ -114,22 +120,24 @@ class TurtleGraphics:
 
         # Build a cairo.Context from a cairo.XlibSurface
         self.canvas = cairo.Context(self.turtle_window.turtle_canvas)
-        cr = gtk.gdk.CairoContext(self.canvas)
-        cr.set_line_cap(1)  # Set the line cap to be round
-
         self.set_pen_size(5)
 
     def setup_svg_surface(self):
         ''' Set up a surface for saving to SVG '''
-        if self.turtle_window.running_sugar:
-            svg_surface = cairo.SVGSurface(
-                os.path.join(get_path(self.turtle_window.activity, 'instance'),
-                             'output.svg'), self.width, self.height)
-        else:
-            svg_surface = cairo.SVGSurface(
-                TMP_SVG_PATH, self.width, self.height)
+        svg_surface = cairo.SVGSurface(self.get_svg_path(),
+                                       self.width, self.height)
+        self.svg_surface = svg_surface
         self.cr_svg = cairo.Context(svg_surface)
         self.cr_svg.set_line_cap(1)  # Set the line cap to be round
+
+    def get_svg_path(self):
+        '''We use a separate file for the svg used for generating Sugar icons
+        '''
+        if self.turtle_window.running_sugar:
+            return os.path.join(get_path(self.turtle_window.activity,
+                                         'instance'), 'output.svg')
+        else:
+            return TMP_SVG_PATH
 
     def fill_polygon(self, poly_points):
         ''' Draw the polygon... '''
@@ -137,7 +145,9 @@ class TurtleGraphics:
             cr.new_path()
             for i, p in enumerate(poly_points):
                 if p[0] == 'move':
-                    cr.move_to(p[1], p[2])
+                    if i == len(poly_points) - 1 or \
+                       poly_points[i + 1][0] not in ['rarc', 'larc']:
+                        cr.move_to(p[1], p[2])
                 elif p[0] == 'rarc':
                     cr.arc(p[1], p[2], p[3], p[4], p[5])
                 elif p[0] == 'larc':
@@ -152,12 +162,12 @@ class TurtleGraphics:
         if self.cr_svg is not None:
             _fill_polygon(self.cr_svg, poly_points)
 
-    def clearscreen(self, share=True):
+    def clearscreen(self):
         '''Clear the canvas and reset most graphics attributes to defaults.'''
 
         def _clearscreen(cr):
             cr.move_to(0, 0)
-            self._bgrgb = [255, 248, 222]
+            self._bgrgb = DEFAULT_BACKGROUND_COLOR
             cr.set_source_rgb(self._bgrgb[0] / 255.,
                               self._bgrgb[1] / 255.,
                               self._bgrgb[2] / 255.)
@@ -268,8 +278,7 @@ class TurtleGraphics:
     def draw_surface(self, surface, x, y, w, h):
         ''' Draw a surface '''
 
-        def _draw_surface(cr, surface, x, y, w, h):
-            cc = gtk.gdk.CairoContext(cr)
+        def _draw_surface(cc, surface, x, y, w, h):
             cc.set_source_surface(surface, x, y)
             cc.rectangle(x, y, w, h)
             cc.fill()
@@ -282,16 +291,15 @@ class TurtleGraphics:
     def draw_pixbuf(self, pixbuf, a, b, x, y, w, h, heading):
         ''' Draw a pixbuf '''
 
-        def _draw_pixbuf(cr, pixbuf, a, b, x, y, w, h, heading):
+        def _draw_pixbuf(cc, pixbuf, a, b, x, y, w, h, heading):
             # Build a gtk.gdk.CairoContext from a cairo.Context to access
             # the set_source_pixbuf attribute.
-            cc = gtk.gdk.CairoContext(cr)
             cc.save()
             # center the rotation on the center of the image
             cc.translate(x + w / 2., y + h / 2.)
             cc.rotate(heading * DEGTOR)
             cc.translate(-x - w / 2., -y - h / 2.)
-            cc.set_source_pixbuf(pixbuf, x, y)
+            Gdk.cairo_set_source_pixbuf(cc, pixbuf, x, y)
             cc.rectangle(x, y, w, h)
             cc.fill()
             cc.restore()
@@ -301,32 +309,41 @@ class TurtleGraphics:
         if self.cr_svg is not None:
             _draw_pixbuf(self.cr_svg, pixbuf, a, b, x, y, w, h, heading)
 
+    def set_font(self, font_name):
+        ''' Set font used by draw_text '''
+        self._font = str(font_name)
+
     def draw_text(self, label, x, y, size, width, heading, scale):
         ''' Draw text '''
 
-        def _draw_text(cr, label, x, y, size, width, scale, heading, rgb):
+        def _draw_text(cc, label, x, y, size, width, scale, heading, rgb,
+                       wrap=False):
             import textwrap
-            final_scale = int(size * scale) * pango.SCALE
+
+            final_scale = int(size * scale) * Pango.SCALE
             label = str(label)
-            label = '\n'.join(textwrap.wrap(label, int(width / scale)))
-            cc = pangocairo.CairoContext(cr)
-            pl = cc.create_layout()
-            fd = pango.FontDescription('Sans')
+            if wrap:
+                label = '\n'.join(textwrap.wrap(label, int(width / scale)))
+
+            pl = PangoCairo.create_layout(cc)
+            fd = Pango.FontDescription(self._font)
             fd.set_size(final_scale)
             pl.set_font_description(fd)
             if isinstance(label, (str, unicode)):
-                pl.set_text(label.replace('\0', ' '))
+                text = label.replace('\0', ' ')
             elif isinstance(label, (float, int)):
-                pl.set_text(str(label))
+                text = str(label)
             else:
-                pl.set_text(str(label))
-            pl.set_width(int(width) * pango.SCALE)
+                text = label
+
+            pl.set_text(str(label), len(str(label)))
+            pl.set_width(int(width) * Pango.SCALE)
             cc.save()
             cc.translate(x, y)
             cc.rotate(heading * DEGTOR)
-            cr.set_source_rgb(rgb[0] / 255., rgb[1] / 255., rgb[2] / 255.)
-            cc.update_layout(pl)
-            cc.show_layout(pl)
+            cc.set_source_rgb(rgb[0] / 255., rgb[1] / 255., rgb[2] / 255.)
+            PangoCairo.update_layout(cc, pl)
+            PangoCairo.show_layout(cc, pl)
             cc.restore()
 
         width *= scale
@@ -335,7 +352,7 @@ class TurtleGraphics:
         self.inval()
         if self.cr_svg is not None:  # and self.pendown:
             _draw_text(self.cr_svg, label, x, y, size, width, scale, heading,
-                       self._fgrgb)
+                       self._fgrgb, wrap=True)
 
     def set_source_rgb(self):
         r = self._fgrgb[0] / 255.
@@ -349,6 +366,7 @@ class TurtleGraphics:
         ''' Draw a line '''
 
         def _draw_line(cr, x1, y1, x2, y2):
+            cr.set_line_cap(1)  # Set the line cap to be round
             cr.move_to(x1, y1)
             cr.line_to(x2, y2)
             cr.stroke()
@@ -416,6 +434,8 @@ class TurtleGraphics:
     def svg_close(self):
         ''' Close current SVG graphic '''
         self.cr_svg.show_page()
+        self.svg_surface.flush()
+        self.svg_surface.finish()
 
     def svg_reset(self):
         ''' Reset svg flags '''

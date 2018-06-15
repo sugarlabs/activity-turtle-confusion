@@ -1,38 +1,38 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#Copyright (c) 2009-12 Walter Bender
+# Copyright (c) 2009-12 Walter Bender
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
-import pygtk
-pygtk.require('2.0')
-import gtk
 import os
+
+from gi.repository import GdkPixbuf
 
 from taconstants import HIT_RED, HIT_GREEN, HIDE_WHITE, SHOW_WHITE, \
     PALETTE_COLOR, TOOLBAR_COLOR
 
 
 class SVG:
-    """ Interface to the graphical representation of blocks, turtles, 
+
+    """ Interface to the graphical representation of blocks, turtles,
     palettes, etc. on screen
-    
+
     terms used here:
     docks -- list of connection points of a block to other blocks
     innies -- right hand side docks of a block, argument slots
@@ -100,12 +100,15 @@ class SVG:
         self.margins = [0, 0, 0, 0]
 
     """
-    The block construction methods typically start on the left side of
-    a block and proceed clockwise around the block, first constructing a
-    left-side connector ("outie"), a corner (1, -1), a slot or hat on along
-    the top, a corner (1, 1), right side connectors ("innie"), possibly a
-    "porch" to suggest an order of arguments, another corner (-1, 1),
-    a tab or tail, and the fourth corner (-1, -1).
+    The block construction methods typically start on the upper-left side
+    of a block and proceed clockwise around the block, first constructing
+    a corner (1, -1), a slot or hat on along the top, a corner (1, 1),
+    right side connectors ("innie"), possibly a "porch" to suggest an
+    order of arguments, another corner (-1, 1), a tab or tail, and the
+    fourth corner (-1, -1), and finally, a left-side connector ("outie").
+    In addition:
+     * Minimum and maximum values are calculated for the SVG bounding box;
+     * Docking coordinates are calculated for each innie, outie, tab, and slot.
     """
 
     def basic_block(self):
@@ -126,13 +129,13 @@ class SVG:
                 svg += self._do_innie()
             if i == 0:
                 svg += self._rline_to(0, self._expand_y)
+            elif i == 1 and self._expand_y2 > 0:
+                svg += self._rline_to(0, self._expand_y2)
             if i == 0 and self._porch is True:
                 svg += self._do_porch(False)
             elif len(self._innie) - 1 > i:
                 svg += self._rline_to(0, 2 * self._innie_y2 +
                                       self._innie_spacer)
-        # moved expand_y to just after first innie above
-        # svg += self._rline_to(0, self._expand_y)
         svg += self._corner(-1, 1)
         svg += self.line_to(xx, self._y)
         svg += self._rline_to(-self._expand_x, 0)
@@ -557,9 +560,14 @@ stroke-width="3.5" fill="%s" stroke="none" />\n' % (self._stroke)
         ''' Special block for collapsible stacks; includes an 'arm"
         that extends down the left side of a stack and a bottom jaw to
         clamp the blocks. '''
+        save_cap = self._cap
+        save_slot = self._slot
         self.reset_min_max()
         x = self._stroke_width / 2.0
-        y = self._stroke_width / 2.0 + self._radius
+        if self._cap:
+            y = self._stroke_width / 2.0 + self._radius + self._slot_y * 3.0
+        else:
+            y = self._stroke_width / 2.0 + self._radius
         self.margins[0] = int((x + self._stroke_width + 0.5) * self._scale)
         self.margins[1] = int((self._stroke_width + 0.5) * self._scale)
         self.margins[2] = 0
@@ -567,6 +575,10 @@ stroke-width="3.5" fill="%s" stroke="none" />\n' % (self._stroke)
         svg = self.new_path(x, y)
         svg += self._corner(1, -1)
         svg += self._do_slot()
+        if self._cap:
+            # Only one cap
+            self._slot = True
+            self._cap = False
         svg += self._rline_to(self._radius + self._stroke_width, 0)
         svg += self._rline_to(self._expand_x, 0)
         xx = self._x
@@ -586,11 +598,11 @@ stroke-width="3.5" fill="%s" stroke="none" />\n' % (self._stroke)
         svg += self._rline_to(0, self._expand_y)
         svg += self._inverse_corner(1, 1, 90, 0, 0)
         svg += self._do_slot()
+        xx = self._x
         svg += self._rline_to(self._radius, 0)
         if self._second_clamp:
             svg += self._corner(-1, 1)
             svg += self.line_to(xx, self._y)
-            svg += self._rline_to(-self._expand_x, 0)
             svg += self._do_tab()
             svg += self._inverse_corner(-1, 1, 90, 0, 0)
             svg += self._rline_to(0, self._expand_y2)
@@ -599,7 +611,14 @@ stroke-width="3.5" fill="%s" stroke="none" />\n' % (self._stroke)
             svg += self._rline_to(self._radius, 0)
         svg += self._corner(-1, 1)
         svg += self._rline_to(-self._radius - self._stroke_width, 0)
-        svg += self._do_tab()
+        if self._tail:
+            svg += self._do_tail()
+        else:
+            svg += self._do_tab()
+
+        self._cap = save_cap
+        self._slot = save_slot
+
         svg += self._corner(-1, -1)
         svg += self._close_path()
         self.calc_w_h()
@@ -920,15 +939,33 @@ stroke-width="3.5" fill="%s" stroke="none" />\n' % (self._stroke)
 
     def _rect(self, w, h, x, y):
         return "%s%s%s%s%s%f%s%f%s%f%s%f%s" % ("<rect style=\"fill:",
-               self._fill, ";stroke:", self._stroke, ";\" width=\"", w,
-               "\" height=\"", h, "\" x=\"", x, "\" y=\"", y, "\" />\n")
+                                               self._fill,
+                                               ";stroke:",
+                                               self._stroke,
+                                               ";\" width=\"",
+                                               w,
+                                               "\" height=\"",
+                                               h,
+                                               "\" x=\"",
+                                               x,
+                                               "\" y=\"",
+                                               y,
+                                               "\" />\n")
 
     def background(self, fill):
         return "%s%s%s%s%s%f%s%f%s%f%s%f%s" % ("<rect style=\"fill:",
-               fill, ";stroke:", fill, ";\" width=\"",
-               self._max_x - self._min_x,
-               "\" height=\"", self._max_y - self._min_y, "\" x=\"",
-               self._min_x, "\" y=\"", self._min_y, "\" />\n")
+                                               fill,
+                                               ";stroke:",
+                                               fill,
+                                               ";\" width=\"",
+                                               self._max_x - self._min_x,
+                                               "\" height=\"",
+                                               self._max_y - self._min_y,
+                                               "\" x=\"",
+                                               self._min_x,
+                                               "\" y=\"",
+                                               self._min_y,
+                                               "\" />\n")
 
     def _check_min_max(self):
         if self._x < self._min_x:
@@ -1282,7 +1319,6 @@ def close_file(f):
 
 
 def generator(datapath):
-
     '''
     svg = SVG()
     f = open_file(datapath, "turtle.svg")
@@ -1529,7 +1565,20 @@ def generator(datapath):
     f.write(svg_str)
     close_file(f)
     '''
-
+    svg = SVG()
+    f = open_file(datapath, "start.svg")
+    svg.set_scale(2)
+    svg.expand(30, 0, 0, 0)
+    svg.set_slot(False)
+    svg.set_cap(True)
+    svg.set_tail(True)
+    svg.set_tab(True)
+    svg.set_boolean(False)
+    svg.second_clamp(False)
+    svg_str = svg.clamp()
+    f.write(svg_str)
+    close_file(f)
+    '''
     svg = SVG()
     f = open_file(datapath, "clampb.svg")
     svg.set_scale(2)
@@ -1553,6 +1602,7 @@ def generator(datapath):
     svg_str = svg.clamp_until()
     f.write(svg_str)
     close_file(f)
+    '''
 
 
 def main():
@@ -1566,7 +1616,7 @@ if __name__ == "__main__":
 
 def svg_str_to_pixbuf(svg_string):
     """ Load pixbuf from SVG string """
-    pl = gtk.gdk.PixbufLoader('svg')
+    pl = GdkPixbuf.PixbufLoader()
     pl.write(svg_string)
     pl.close()
     pixbuf = pl.get_pixbuf()

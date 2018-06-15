@@ -26,7 +26,7 @@ from functools import partial
 
 import dbus
 from dbus import PROPERTIES_IFACE
-import gobject
+from gi.repository import GObject
 from telepathy.client import Channel
 from telepathy.interfaces import (CHANNEL,
                                   CHANNEL_INTERFACE_GROUP,
@@ -43,10 +43,11 @@ from telepathy.constants import (CHANNEL_GROUP_FLAG_CHANNEL_SPECIFIC_HANDLES,
 CONN_INTERFACE_ACTIVITY_PROPERTIES = 'org.laptop.Telepathy.ActivityProperties'
 CONN_INTERFACE_BUDDY_INFO = 'org.laptop.Telepathy.BuddyInfo'
 
-_logger = logging.getLogger('sugar.presence.activity')
+_logger = logging.getLogger('sugar3.presence.activity')
 
 
-class Activity(gobject.GObject):
+class Activity(GObject.GObject):
+
     """UI interface for an Activity in the presence service
 
     Activities in the presence service represent your and other user's
@@ -60,24 +61,24 @@ class Activity(gobject.GObject):
         joined
     """
     __gsignals__ = {
-        'buddy-joined': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE,
-                         ([gobject.TYPE_PYOBJECT])),
-        'buddy-left': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE,
-                       ([gobject.TYPE_PYOBJECT])),
-        'new-channel': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE,
-                        ([gobject.TYPE_PYOBJECT])),
-        'joined': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE,
-                   ([gobject.TYPE_PYOBJECT, gobject.TYPE_PYOBJECT])),
+        'buddy-joined': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE,
+                         ([GObject.TYPE_PYOBJECT])),
+        'buddy-left': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE,
+                       ([GObject.TYPE_PYOBJECT])),
+        'new-channel': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE,
+                        ([GObject.TYPE_PYOBJECT])),
+        'joined': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE,
+                   ([GObject.TYPE_PYOBJECT, GObject.TYPE_PYOBJECT])),
     }
 
     __gproperties__ = {
-        'id': (str, None, None, None, gobject.PARAM_READABLE),
-        'name': (str, None, None, None, gobject.PARAM_READWRITE),
-        'tags': (str, None, None, None, gobject.PARAM_READWRITE),
-        'color': (str, None, None, None, gobject.PARAM_READWRITE),
-        'type': (str, None, None, None, gobject.PARAM_READABLE),
-        'private': (bool, None, None, True, gobject.PARAM_READWRITE),
-        'joined': (bool, None, None, False, gobject.PARAM_READABLE),
+        'id': (str, None, None, None, GObject.PARAM_READABLE),
+        'name': (str, None, None, None, GObject.PARAM_READWRITE),
+        'tags': (str, None, None, None, GObject.PARAM_READWRITE),
+        'color': (str, None, None, None, GObject.PARAM_READWRITE),
+        'type': (str, None, None, None, GObject.PARAM_READABLE),
+        'private': (bool, None, None, True, GObject.PARAM_READWRITE),
+        'joined': (bool, None, None, False, GObject.PARAM_READABLE),
     }
 
     def __init__(self, account_path, connection, room_handle=None,
@@ -88,7 +89,7 @@ class Activity(gobject.GObject):
         if properties is None:
             properties = {}
 
-        gobject.GObject.__init__(self)
+        GObject.GObject.__init__(self)
 
         self._account_path = account_path
         self.telepathy_conn = connection
@@ -110,7 +111,7 @@ class Activity(gobject.GObject):
         self._buddies = {}
 
         self._get_properties_call = None
-        if not self.room_handle is None:
+        if self.room_handle is not None:
             self._start_tracking_properties()
 
     def _start_tracking_properties(self):
@@ -321,7 +322,7 @@ class Activity(gobject.GObject):
 
     def _add_initial_buddies(self, contact_ids):
         print('__add_initial_buddies %r', contact_ids)
-        #for contact_id in contact_ids:
+        # for contact_id in contact_ids:
         #    self._buddies[contact_id] = self._get_buddy(contact_id)
         # Once we have the initial members, we can finish the join process
         self._joined = True
@@ -359,9 +360,9 @@ class Activity(gobject.GObject):
 
     def _get_buddy(self, contact_id):
         return None
-        #if contact_id in self._buddies:
+        # if contact_id in self._buddies:
         #    return self._buddies[contact_id]
-        #else:
+        # else:
         #    return Buddy(self._account_path, contact_id)
 
     def join(self):
@@ -384,7 +385,7 @@ class Activity(gobject.GObject):
         self._join_command.run()
 
     def share(self, share_activity_cb, share_activity_error_cb):
-        if not self.room_handle is None:
+        if self.room_handle is not None:
             raise ValueError('Already have a room handle')
 
         self._share_command = _ShareCommand(self.telepathy_conn, self._id)
@@ -470,14 +471,14 @@ class Activity(gobject.GObject):
         self.telepathy_text_chan.Close()
 
 
-class _BaseCommand(gobject.GObject):
+class _BaseCommand(GObject.GObject):
     __gsignals__ = {
-        'finished': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE,
+        'finished': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE,
                      ([object])),
     }
 
     def __init__(self):
-        gobject.GObject.__init__(self)
+        GObject.GObject.__init__(self)
 
         self.text_channel = None
         self.text_channel_group_flags = None
@@ -490,6 +491,7 @@ class _BaseCommand(gobject.GObject):
 
 
 class _ShareCommand(_BaseCommand):
+
     def __init__(self, connection, activity_id):
         _BaseCommand.__init__(self)
 
@@ -542,6 +544,7 @@ class _ShareCommand(_BaseCommand):
 
 
 class _JoinCommand(_BaseCommand):
+
     def __init__(self, connection, room_handle):
         _BaseCommand.__init__(self)
 

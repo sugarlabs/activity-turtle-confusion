@@ -1,34 +1,34 @@
 # -*- coding: utf-8 -*-
-#Copyright (c) 2010-13 Walter Bender
+# Copyright (c) 2010-13 Walter Bender
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 import os
-
-import gtk
-import gobject
 import cairo
+import tempfile
 
+from gi.repository import GObject
+from gi.repository import Gdk
 from random import uniform
 from math import sin, cos, pi, sqrt
 from taconstants import (TURTLE_LAYER, DEFAULT_TURTLE_COLORS, DEFAULT_TURTLE,
-                         Color)
+                         CONSTANTS, Color, ColorObj)
 from tasprite_factory import SVG, svg_str_to_pixbuf
 from tacanvas import wrap100, COLOR_TABLE
 from sprites import Sprite
@@ -187,11 +187,14 @@ class Turtles:
         else:
             self._active_turtle = self.get_turtle(turtle_name, False)
         self._active_turtle.show()
-        self._active_turtle.set_color(share=False)
-        self._active_turtle.set_gray(share=False)
-        self._active_turtle.set_shade(share=False)
-        self._active_turtle.set_pen_size(share=False)
-        self._active_turtle.set_pen_state(share=False)
+        # self._active_turtle.set_color(share=False)
+        # self._active_turtle.set_gray(share=False)
+        # self._active_turtle.set_shade(share=False)
+        # self._active_turtle.set_pen_size(share=False)
+        # self._active_turtle.set_pen_state(share=False)
+
+        # self._active_turtle.set_xy(share=False)
+        # self._active_turtle.set_heading(share=False)
 
     def set_default_turtle_name(self, name):
         self._default_turtle_name = name
@@ -264,7 +267,7 @@ class Turtle:
         self._half_width = int(self.spr.rect.width / 2.0)
         self._half_height = int(self.spr.rect.height / 2.0)
         self._drag_radius = ((self._half_width * self._half_width) +
-                            (self._half_height * self._half_height)) / 6
+                             (self._half_height * self._half_height)) / 6
 
     def set_remote(self):
         self._remote = True
@@ -321,12 +324,12 @@ class Turtle:
                 for i in range(SHAPES):
                     surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, nw, nh)
                     context = cairo.Context(surface)
-                    context = gtk.gdk.CairoContext(context)
+
                     context.translate(nw / 2.0, nh / 2.0)
                     context.rotate(i * 10 * pi / 180.)
                     context.translate(-nw / 2.0, -nh / 2.0)
-                    context.set_source_pixbuf(shapes[0], (nw - w) / 2.0,
-                                              (nh - h) / 2.0)
+                    Gdk.cairo_set_source_pixbuf(
+                        context, shapes[0], (nw - w) / 2.0, (nh - h) / 2.0)
                     context.rectangle(0, 0, nw, nh)
                     context.fill()
                     images.append(surface)
@@ -345,9 +348,10 @@ class Turtle:
             self._custom_shapes = False
             self._calculate_sizes()
 
-    def set_heading(self, heading, share=True):
+    def set_heading(self, heading=None, share=True):
         ''' Set the turtle heading (one shape per 360/SHAPES degrees) '''
-        self._heading = heading
+        if heading is not None:
+            self._heading = heading
         self._heading %= 360
 
         self._update_sprite_heading()
@@ -368,9 +372,12 @@ class Turtle:
 
     def set_color(self, color=None, share=True):
         ''' Set the pen color for this turtle. '''
+        if isinstance(color, ColorObj):
+            # See comment in tatype.py TYPE_BOX -> TYPE_COLOR
+            color = color.color
         if color is None:
             color = self._pen_color
-        # Special case for color blocks
+        # Special case for color blocks from CONSTANTS
         elif isinstance(color, Color):
             self.set_shade(color.shade, share)
             self.set_gray(color.gray, share)
@@ -566,8 +573,11 @@ class Turtle:
         distance = 0 - distance
         self.forward(distance, share)
 
-    def set_xy(self, x, y, share=True, pendown=True, dragging=False):
+    def set_xy(self, x=None, y=None, share=True, pendown=True, dragging=False):
         old = self.get_xy()
+        if x is None or y is None:
+            x = old[0]
+            y = old[1]
         if dragging:
             xcor = x
             ycor = y
@@ -615,12 +625,10 @@ class Turtle:
                                                     self._heading)
 
             if self._pen_fill:
-                if self._poly_points == []:
-                    self._poly_points.append(('move', npos[0], npos[1]))
-                    self._poly_points.append(('rarc', npos[0], npos[1], r,
-                                              (self._heading - 180) * DEGTOR,
-                                              (self._heading - 180 + a)
-                                              * DEGTOR))
+                self._poly_points.append(('move', npos[0], npos[1]))
+                self._poly_points.append(('rarc', npos[0], npos[1], r,
+                                          (self._heading - 180) * DEGTOR,
+                                          (self._heading - 180 + a) * DEGTOR))
 
         self.right(a, False)
         return [cx - r * cos(self._heading * DEGTOR),
@@ -641,11 +649,10 @@ class Turtle:
                                                     self._heading)
 
             if self._pen_fill:
-                if self._poly_points == []:
-                    self._poly_points.append(('move', npos[0], npos[1]))
-                    self._poly_points.append(('larc', npos[0], npos[1], r,
-                                              (self._heading) * DEGTOR,
-                                              (self._heading - a) * DEGTOR))
+                self._poly_points.append(('move', npos[0], npos[1]))
+                self._poly_points.append(('larc', npos[0], npos[1], r,
+                                          (self._heading) * DEGTOR,
+                                          (self._heading - a) * DEGTOR))
 
         self.right(-a, False)
         return [cx + r * cos(self._heading * DEGTOR),
@@ -661,7 +668,7 @@ class Turtle:
                 tmp_path = get_path(self._turtles.turtle_window.activity,
                                     'instance')
             else:
-                tmp_path = '/tmp'
+                tmp_path = tempfile.gettempdir()
             tmp_file = os.path.join(
                 get_path(self._turtles.turtle_window.activity, 'instance'),
                 'tmpfile.png')
@@ -680,7 +687,7 @@ class Turtle:
                                                round_int(width),
                                                round_int(height),
                                                data]]))
-            gobject.idle_add(self._turtles.turtle_window.send_event, event)
+            GObject.idle_add(self._turtles.turtle_window.send_event, event)
 
             os.remove(tmp_file)
 
@@ -715,10 +722,10 @@ class Turtle:
 
     def get_xy(self):
         return [self._x, self._y]
-    
+
     def get_x(self):
         return self._x
-    
+
     def get_y(self):
         return self._y
 

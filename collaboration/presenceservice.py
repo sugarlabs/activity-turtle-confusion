@@ -22,7 +22,6 @@ STABLE.
 
 import logging
 
-import gobject
 import dbus
 import dbus.exceptions
 import dbus.glib
@@ -30,9 +29,9 @@ from dbus import PROPERTIES_IFACE
 
 """ FIXME ... """
 try:
-    from sugar.presence.buddy import Buddy
-    from sugar.presence.activity import Activity
-    from sugar.presence.connectionmanager import get_connection_manager
+    from sugar3.presence.buddy import Buddy
+    from sugar3.presence.activity import Activity
+    from sugar3.presence.connectionmanager import get_connection_manager
 except ImportError:
     pass
 
@@ -40,9 +39,9 @@ from telepathy.interfaces import (ACCOUNT,
                                   ACCOUNT_MANAGER,
                                   CONNECTION)
 from telepathy.constants import HANDLE_TYPE_CONTACT
+from gi.repository import GObject
 
-
-_logger = logging.getLogger('sugar.presence.presenceservice')
+_logger = logging.getLogger('sugar3.presence.presenceservice')
 
 ACCOUNT_MANAGER_SERVICE = 'org.freedesktop.Telepathy.AccountManager'
 ACCOUNT_MANAGER_PATH = '/org/freedesktop/Telepathy/AccountManager'
@@ -50,17 +49,18 @@ ACCOUNT_MANAGER_PATH = '/org/freedesktop/Telepathy/AccountManager'
 CONN_INTERFACE_ACTIVITY_PROPERTIES = 'org.laptop.Telepathy.ActivityProperties'
 
 
-class PresenceService(gobject.GObject):
+class PresenceService(GObject.GObject):
+
     """Provides simplified access to the Telepathy framework to activities"""
     __gsignals__ = {
-        'activity-shared': (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE,
-                            ([gobject.TYPE_PYOBJECT, gobject.TYPE_PYOBJECT,
-                              gobject.TYPE_PYOBJECT])), }
+        'activity-shared': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE,
+                            ([GObject.TYPE_PYOBJECT, GObject.TYPE_PYOBJECT,
+                              GObject.TYPE_PYOBJECT])), }
 
     def __init__(self):
         """Initialise the service and attempt to connect to events
         """
-        gobject.GObject.__init__(self)
+        GObject.GObject.__init__(self)
 
         self._activity_cache = None
         self._buddy_cache = {}
@@ -90,7 +90,7 @@ class PresenceService(gobject.GObject):
                     room_handle = connection.connection.GetActivity(
                         activity_id,
                         dbus_interface=CONN_INTERFACE_ACTIVITY_PROPERTIES)
-                except dbus.exceptions.DBusException, e:
+                except dbus.exceptions.DBusException as e:
                     name = 'org.freedesktop.Telepathy.Error.NotAvailable'
                     if e.get_dbus_name() == name:
                         logging.debug("There's no shared activity with the id "
@@ -171,7 +171,7 @@ class PresenceService(gobject.GObject):
 
     def get_owner(self):
         """Retrieves the laptop Buddy object."""
-        #return Owner()
+        # return Owner()
         return None
 
     def __share_activity_cb(self, activity):

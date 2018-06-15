@@ -81,7 +81,7 @@ class RingBuffer1d(object):
         Positive values will give the latest information, negative values will
         give the newest added information from the buffer. (in normal order)
         """
-        if number == None:
+        if number is None:
             number = len(self._data) // step
 
         number *= step

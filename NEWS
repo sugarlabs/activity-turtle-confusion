@@ -1,9 +1,227 @@
+218
+* fix problem with Gio.Settings in cmdline version (walter)
+* fix problem with -o from  cmdline version (walter)
+* fix problem with line cap (walter)
+* fix problem with fullscreen/unfullscreen (walter)
+* fix numerous problems with file save buttons (walter)
+* fix import require warning (walter)
+
+217
+* migrate from GConf to Gio.Settings (walter)
+
+216
+* conversion to GTK3 (zeecoder)
+* update repository field in activity.info
+
+215
+* fix error on fb_plugin menu creation  (AlanJAS)
+* fix get_endswith_files function (AlanJAS)
+* fix parameter on cancel_plugin_install call (AlanJAS)
+* remove duplicated import (AlanJAS)
+* better handle of temporary folder use (AlanJAS)
+* fix when dbus is not supported (AlanJAS)
+* workarround for gtk-xft-dpi possible error (AlanJAS)
+* simplify is_writeable function (AlanJAS)
+* create svg surface only when export (AlanJAS)
+* new translations (Chris Leonard)
+* fix show show samples in gnome (AlanJAS)
+* update logo.boxes with BOX (AlanJAS)
+* Fix bug introduced in 70e9d98 for samples picker. (Icarito)
+* Add feature to export blocks as image. (Icarito)
+* Add uri handler (Icarito)
+* fix logic of plugin active (AlanJAS)
+* show all plugins by default (AlanJAS)
+* fixes in taplugin (AlanJAS)
+* check for None case (Walter Bender)
+* pep8 fixes; using single quotes where available (Walter Bender)
+* make plugin global to python code (AlanJAS)
+* fix typo (AlanJAS)
+* remove glob dependency (AlanJAS)
+* simplify menubuilder (AlanJAS)
+* removing has_toolbarbox (AlanJAS)
+* Remove suspicious code (rbuj)
+* workarround for pyexported path problem (AlanJAS)
+* fix error of no menu in pyexported (AlanJAS)
+* updates to hi.po
+* tweaks to converter block code: use existing turtle graphics canvas
+  (Walter Bender)
+* use TB instead of TA (Walter Bender)
+* lowercased colors names in new adapter block (Rafael Cordano)
+* Added apater color block (Rafael Cordano)
+
+214
+* Updated translations
+* Added repository to activity.info
+
+213
+* Missed updating one import after utils moved to TurtleArt/
+
+212
+* Configuration clean up by Daniel Drake.
+
+211
+* Better handling of plugins (Alan Aguiar)
+
+210
+
+BUG FIX:
+* Add broot path when exporting to Python.
+
+209
+
+ENHANCEMENT:
+* Add export SVG and Icon to GNOME menu (Alan Aguiar)
+* New example project: pinwheel
+* Save and restore private block data
+
+BUG FIXES:
+* Fine-tune some block label positioning
+* Use unique name (by user) for tmp files for multiuser systems (#4788)
+* Fix regression in saving to SVG
+* Fix regression in paste from GNOME
+* Fixed problem with camera crash (SL#2624)
+
+208
+
+ENHANCEMENT:
+* Expand dock for oversized arguments in fill_screen block (et al.)
+
+207
+
+ENHANCEMENT:
+* Added 'private' attribute to block class for plugins
+
+BUG FIXES:
+* Rescale constants when rescaling coordinates
+* Rescale mouse coordinates to match current scale
+
+206
+
+ENHANCEMENTS:
+* New translations
+* Slight speed up when loading large projects
+* Added set_font block
+* Added ASCII Art example
+* Autosave in GNOME (Sugar version already autosaves)
+* Add Alt-s keyboard shortcut to stop turtle (w/Andres Aguirre)
+
+BUG FIXES:
+* Set default action (Yes) for save in GNOME (Andres Aguirre)
+* Don't try writing to READ_ONLY directories
+* Don't try writing to READ_ONLY files
+* Fix problems with PO files
+
+205
+
+ENHANCEMENTS:
+* Use clamp style for start and action stacks
+* Warn user when running empty start stack
+* More "turtle cards"
+
+BUG FIXES:
+* Don't reset timer on clear (w/Alan Aguiar)
+* Catch exceptions in Facebook upload (#SL )
+
+204
+
+ENHANCEMENTS:
+* Added new Python block example: text_line.py
+* Added new "simple" Sierpinski triangle example (w/Bernie Innocenti)
+
+BUG FIXES:
+* Fixed regression in trash due to v203
+* Fixed regression in loading of media blocks
+* Fixed regression in picture block prototypes
+* Fixed regression in journal blocks
+* Fixed regression in bulletlist blocks
+* Fixed problems with Media About Me example program
+* Fixed problem with Sensor Follow Me example program
+* Fixed problem with Media Journal Stats example program
+* Moved data file to samples/data
+
+203
+
+ENHANCEMENT:
+* Add support for a "vector" datatype (used by the "food" plugin)
+
+BUG FIX:
+* Fix problem with duplicate blocks (e.g., start) when restoring from
+  the Trash Palette (w/Ignacio Rodriguez)
+
+202
+
+ENHANCEMENT:
+* Make default fillscreen match default background color (light blue)
+
+BUG FIX:
+* Update remote turtle before drawing text
+* Fixed regression in save to ODP code
+
+201
+
+ENHANCEMENT:
+* New sample program: plot global tempuratures (temperature data from
+  http://eesc.columbia.edu/courses/ees/climate/labs/globaltemp/data/
+  global_temp.xls)
+
+BUG FIXES:
+* Fixed problem with turning off hover help (Alan Aguiar)
+* Fixed problem with starting plugins from exported Python code
+* FIxed problem with label offset (SL #4754)
+
+200
+
+BUG FIXES:
+* Fixed regression in python export due to typo
+* Fixed regression in boolean operators due to ColorObj class
+* Fixed block scaling problem
+
+199
+
+ENHANCEMENTS:
+* Use journal or file block for all media types
+* Play audio and video from the web
+
+BUG FIXES:
+* Eliminate extra space around protoblock labels
+* Code cleanup: separate classes for Selectors and PaletteViews
+* Use built-in Python mimetype processing
+* Cleaned up gplay code (uses debug_output)
+
+198
+
+BUG FIXES:
+* Fixed bug with color constants when used with push/pop and boxes
+* Fixed bug with hover help in GNOME (Alan Aguiar)
+
+197
+
+BUG FIX:
+* Fixed problem with dragging canvas while programming is running
+
+196
+
+ENHANCEMENTS:
+* New translations
+* Export project as Sugar icon (Jorge Alberto Gómez López)
+* Export project as ODP (Jorge Alberto Gómez López)
+
+BUG FIXES:
+* Fixed problem with Returns in action and box names (as reported by quozi)
+* Fixed problem with label positioning on some blocks
+* Fixed rendering problem with filled shapes using arcs
+* Fixed problem with sharing filled shapes using arcs
+* Make save_as_icon button insensitive when no svg output
+  available (Ignacio Rodriguez)
+* Make save_as_ODP button insensitive when no saved pictures
+  available (Ignacio Rodriguez)
+
 195
 
 ENHANCEMENTS:
 * New translations
 
-BUG FIX:
+BUG FIXES:
 * Added missing parens for some binary operations in Python export
 * Fixed positioning of help messages (#4679)
 

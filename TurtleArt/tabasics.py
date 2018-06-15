@@ -1,23 +1,23 @@
 # -*- coding: utf-8 -*-
-#Copyright (c) 2011, 2012 Walter Bender
+# Copyright (c) 2011, 2012 Walter Bender
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 '''
 This file contains the constants  that by-in-large determine the
@@ -102,11 +102,14 @@ from gettext import gettext as _
 
 from tapalette import (make_palette, define_logo_function)
 from talogo import primitive_dictionary
-from taconstants import (Color, CONSTANTS)
+from taconstants import (
+    Color,
+    CONSTANTS,
+    DEFAULT_BACKGROUND_COLOR_SHADE_GRAY)
 from taprimitive import (ArgSlot, ConstantArg, or_, Primitive)
 from tatype import (TYPE_BOOL, TYPE_BOX, TYPE_CHAR, TYPE_COLOR, TYPE_FLOAT,
                     TYPE_INT, TYPE_NUMBER, TYPE_NUMERIC_STRING, TYPE_OBJECT,
-                    TYPE_STRING)
+                    TYPE_STRING, TYPE_VECTOR)
 from taturtle import Turtle
 
 
@@ -116,6 +119,7 @@ def _millisecond():
 
 
 class Palettes():
+
     ''' a class for creating the palettes of blocks '''
 
     def __init__(self, turtle_window):
@@ -194,7 +198,7 @@ turtle'))
                                     Primitive(self.tw.clear_plugins),
                                     Primitive(self.tw.lc.stop_playing_media),
                                     Primitive(self.tw.lc.reset_scale),
-                                    Primitive(self.tw.lc.reset_timer),
+                                    # Primitive(self.tw.lc.reset_timer),
                                     Primitive(self.tw.lc.clear_value_blocks),
                                     Primitive(self.tw.canvas.clearscreen),
                                     Primitive(self.tw.lc.reset_internals),
@@ -355,7 +359,7 @@ setxy :x :y\npendown\nend\n')
                           style='basic-style-2arg',
                           label=[_('fill screen'), _('color'), _('shade')],
                           prim_name='fillscreen',
-                          default=[60, 80],
+                          default=DEFAULT_BACKGROUND_COLOR_SHADE_GRAY[0:2],
                           logo_command='tasetbackground',
                           help_string=_('fills the background with (color, \
 shade)'))
@@ -369,7 +373,7 @@ shade)'))
                           label=[_('fill screen') + '\n\n', _('color'),
                                  _('shade'), _('gray')],
                           prim_name='fillscreen2',
-                          default=[60, 80, 100],
+                          default=DEFAULT_BACKGROUND_COLOR_SHADE_GRAY,
                           logo_command='tasetbackground',
                           help_string=_('fills the background with (color, \
 shade)'))
@@ -446,8 +450,12 @@ in place of a number block)'),
                           value_block=True,
                           prim_name='shade',
                           logo_command=':shade')
-        self.tw.lc.def_prim('shade', 0,
-                            Primitive(Turtle.get_shade, return_type=TYPE_NUMBER))
+        self.tw.lc.def_prim(
+            'shade',
+            0,
+            Primitive(
+                Turtle.get_shade,
+                return_type=TYPE_NUMBER))
 
         palette.add_block('gray',
                           style='box-style',
@@ -536,6 +544,9 @@ in place of a number block)'),
         define_logo_function('tapensize', 'to tapensize\noutput first round \
 pensize\nend\n')
 
+    def _rgb_converter(self, r, g, b):
+        return float(self.tw.canvas.get_color_index(r, g, b))
+
     def _color_palette(self):
         ''' The basic Turtle Art color palette '''
 
@@ -552,6 +563,25 @@ pensize\nend\n')
                             _('black'))
         for name in color_names:
             self._make_constant(palette, name, _(name), name)
+
+        palette.add_block('RGB to color',
+                          style='number-style-var-3arg',
+                          label=[_('RGB to\n\ncolor'), _(
+                              'red'), _('green'), _('blue')],
+                          default=[0, 0, 0],
+                          help_string=_('converter'),
+                          prim_name='converter')
+
+        self.tw.lc.def_prim(
+            'converter',
+            3,
+            Primitive(
+                self._rgb_converter,
+                return_type=TYPE_FLOAT,
+                arg_descs=[
+                    ArgSlot(TYPE_INT),
+                    ArgSlot(TYPE_INT),
+                    ArgSlot(TYPE_INT)]))
 
         # In order to map Turtle Art colors to the standard UCB Logo palette,
         # we need to define a somewhat complex set of functions.
@@ -651,7 +681,11 @@ tasetshade :shade \n')
                 # ... or concatenate two strings
                 Primitive(Primitive.plus, return_type=TYPE_STRING,
                           arg_descs=[ArgSlot(TYPE_STRING),
-                                     ArgSlot(TYPE_STRING)])))
+                                     ArgSlot(TYPE_STRING)]),
+                # ... or add two vectors
+                Primitive(Primitive.plus, return_type=TYPE_VECTOR,
+                          arg_descs=[ArgSlot(TYPE_VECTOR),
+                                     ArgSlot(TYPE_VECTOR)])))
 
         palette.add_block('minus2',
                           style='number-style-porch',
@@ -663,8 +697,14 @@ tasetshade :shade \n')
 top numeric input'))
         self.tw.lc.def_prim(
             'minus', 2,
-            Primitive(Primitive.minus, return_type=TYPE_NUMBER,
-                      arg_descs=[ArgSlot(TYPE_NUMBER), ArgSlot(TYPE_NUMBER)]))
+            or_(Primitive(Primitive.minus, return_type=TYPE_NUMBER,
+                          arg_descs=[ArgSlot(TYPE_NUMBER),
+                                     ArgSlot(TYPE_NUMBER)]),
+                # ... or add two vectors
+                Primitive(Primitive.minus, return_type=TYPE_VECTOR,
+                          arg_descs=[ArgSlot(TYPE_VECTOR),
+                                     ArgSlot(TYPE_VECTOR)])))
+
         define_logo_function('taminus', 'to taminus :y :x\noutput sum :x \
 minus :y\nend\n')
 
@@ -677,8 +717,15 @@ minus :y\nend\n')
                           help_string=_('multiplies two numeric inputs'))
         self.tw.lc.def_prim(
             'product', 2,
-            Primitive(Primitive.multiply, return_type=TYPE_NUMBER,
-                      arg_descs=[ArgSlot(TYPE_NUMBER), ArgSlot(TYPE_NUMBER)]))
+            or_(Primitive(Primitive.multiply, return_type=TYPE_NUMBER,
+                          arg_descs=[ArgSlot(TYPE_NUMBER),
+                                     ArgSlot(TYPE_NUMBER)]),
+                Primitive(Primitive.multiply, return_type=TYPE_VECTOR,
+                          arg_descs=[ArgSlot(TYPE_VECTOR),
+                                     ArgSlot(TYPE_NUMBER)]),
+                Primitive(Primitive.multiply, return_type=TYPE_VECTOR,
+                          arg_descs=[ArgSlot(TYPE_NUMBER),
+                                     ArgSlot(TYPE_VECTOR)])))
 
         palette.add_block('division2',
                           style='number-style-porch',
@@ -690,8 +737,15 @@ minus :y\nend\n')
 (numerator) by bottom numeric input (denominator)'))
         self.tw.lc.def_prim(
             'division', 2,
-            Primitive(Primitive.divide, return_type=TYPE_NUMBER,
-                      arg_descs=[ArgSlot(TYPE_NUMBER), ArgSlot(TYPE_NUMBER)]))
+            or_(Primitive(Primitive.divide, return_type=TYPE_NUMBER,
+                          arg_descs=[ArgSlot(TYPE_NUMBER),
+                                     ArgSlot(TYPE_NUMBER)]),
+                Primitive(Primitive.divide, return_type=TYPE_VECTOR,
+                          arg_descs=[ArgSlot(TYPE_VECTOR),
+                                     ArgSlot(TYPE_NUMBER)]),
+                Primitive(Primitive.divide, return_type=TYPE_VECTOR,
+                          arg_descs=[ArgSlot(TYPE_NUMBER),
+                                     ArgSlot(TYPE_VECTOR)])))
 
         palette.add_block('identity2',
                           style='number-style-1arg',
@@ -717,6 +771,8 @@ blocks'))
                           arg_descs=[ArgSlot(TYPE_NUMBER)]),
                 Primitive(Primitive.identity, return_type=TYPE_STRING,
                           arg_descs=[ArgSlot(TYPE_STRING)]),
+                Primitive(Primitive.identity, return_type=TYPE_VECTOR,
+                          arg_descs=[ArgSlot(TYPE_VECTOR)]),
                 Primitive(Primitive.identity, return_type=TYPE_OBJECT,
                           arg_descs=[ArgSlot(TYPE_OBJECT)])))
 
@@ -926,7 +982,7 @@ number of seconds'))
 
         palette.add_block('if',
                           style='clamp-style-boolean',
-                          label=[_('if'), _('then'), ''],
+                          label=[_('if'), _('then')],
                           prim_name='if',
                           default=[None, None],
                           special_name=_('if then'),
@@ -1004,7 +1060,7 @@ boolean operators from Numbers palette'))
                                translation=_('blocks'))
 
         palette.add_block('start',
-                          style='basic-style-head',
+                          style='clamp-style-hat',
                           label=_('start'),
                           prim_name='start',
                           logo_command='to start\n',
@@ -1018,15 +1074,8 @@ buttons'))
                 Primitive(self.tw.lc.prim_define_stack,
                           arg_descs=[ConstantArg('start')])])]))
 
-        palette.add_block('string',
-                          style='box-style',
-                          label=_('text'),
-                          default=_('text'),
-                          special_name=_('text'),
-                          help_string=_('string value'))
-
         palette.add_block('hat',
-                          style='basic-style-head-1arg',
+                          style='clamp-style-hat-1arg',
                           label=_('action'),
                           prim_name='nop3',
                           string_or_number=True,
@@ -1185,6 +1234,34 @@ variable'))
             Primitive(self.tw.lc.prim_invoke_stack,
                       arg_descs=[ConstantArg('stack2')]),
             True)
+
+        primitive_dictionary['returnstack'] = Primitive(
+            self.tw.lc.prim_invoke_return_stack,
+            return_type=TYPE_OBJECT,
+            arg_descs=[ArgSlot(TYPE_OBJECT)])
+        palette.add_block('returnstack',
+                          # hidden=True,
+                          style='number-style-1arg',
+                          label=_('action'),
+                          string_or_number=True,
+                          prim_name='returnstack',
+                          logo_command='action',
+                          default=_('action'),
+                          help_string=_('invokes named action stack and returns value'))
+        self.tw.lc.def_prim('returnstack', 1,
+                            primitive_dictionary['returnstack'], True)
+
+        palette.add_block('return',
+                          # hidden=True,
+                          style='basic-style-1arg',
+                          label=_('return'),
+                          prim_name='return',
+                          logo_command='stop',
+                          help_string=_('returns a value'))
+        self.tw.lc.def_prim(
+            'return', 1,
+            Primitive(self.tw.lc.prim_return,
+                      arg_descs=[ArgSlot(TYPE_OBJECT)]))
 
     def _trash_palette(self):
         ''' The basic Turtle Art turtle palette '''

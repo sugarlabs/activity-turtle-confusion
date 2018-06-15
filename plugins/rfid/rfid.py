@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-#Copyright (C) 2010,11 Emiliano Pastorino <epastorino@plan.ceibal.edu.uy>
-#Copyright (c) 2011 Walter Bender
+# Copyright (C) 2010,11 Emiliano Pastorino <epastorino@plan.ceibal.edu.uy>
+# Copyright (c) 2011 Walter Bender
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -61,7 +61,7 @@ class Rfid(Plugin):
         """
 
         self.rfid_connected = False
-        self.rfid_device = find_device(path=parent.path)
+        self.rfid_device = find_device()
         self.rfid_idn = ''
 
         if self.rfid_device is not None:
@@ -73,8 +73,11 @@ class Rfid(Plugin):
 
             loop = DBusGMainLoop()
             bus = dbus.SystemBus(mainloop=loop)
-            hmgr_iface = dbus.Interface(bus.get_object(HAL_SERVICE,
-                HAL_MGR_PATH), HAL_MGR_IFACE)
+            hmgr_iface = dbus.Interface(
+                bus.get_object(
+                    HAL_SERVICE,
+                    HAL_MGR_PATH),
+                HAL_MGR_IFACE)
 
             hmgr_iface.connect_to_signal('DeviceAdded', self._device_added_cb)
 
@@ -126,7 +129,7 @@ class Rfid(Plugin):
         Called from hal connection when a new device is plugged.
         """
         if not self.rfid_connected:
-            self.rfid_device = find_device(path=parent.path)
+            self.rfid_device = find_device()
             _logger.debug("DEVICE_ADDED: %s" % self.rfid_device)
             if self.rfid_device is not None:
                 _logger.debug("DEVICE_ADDED: RFID device is not None!")
