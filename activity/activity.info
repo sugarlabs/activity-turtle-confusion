@@ -1,13 +1,13 @@
 [Activity]
 name = Turtle Confusion
 activity_version = 218
-license = MIT
+license = MIT;GPLv2+;LGPLv2+;LGPLv2.1+;LGPLv3+;GPLv3+;BSD
 bundle_id = org.laptop.TurtleConfusionActivity
 exec = sugar-activity TurtleArtActivity.TurtleArtActivity
 icon = activity-turtleart
 show_launcher = yes
-website = http://wiki.sugarlabs.org/go/Activities/Turtle_Art
 mime_types = application/x-turtle-art;application/vnd.turtleblocks
-categories = programming art
-summary = A Logo-inspired turtle that draws colorful pictures with snap-together visual programming blocks
+summary = A Logo-inspired turtle that draws colorful pictures with snap-together visual programming blocks.
 repository = https://github.com/sugarlabs/activity-turtle-confusion
+url = https://help.sugarlabs.org/en/turtle_confusion.html
+tags = Maths;Game;Programming
