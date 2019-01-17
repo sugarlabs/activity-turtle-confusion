@@ -1885,8 +1885,9 @@ class TurtleArtActivity(activity.Activity):
 
         self._selected_challenge = image_path
         self._challenge_window.hide()
-        self._load_level()
         self.get_window().set_cursor(Gdk.Cursor(Gdk.CursorType.WATCH))
+        self._load_level()
+        self.get_window().set_cursor(Gdk.Cursor(Gdk.CursorType.LEFT_PTR))
 
 
     def _fill_challenges_list(self, store):
